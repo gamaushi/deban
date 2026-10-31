@@ -820,6 +820,30 @@ function importBackup(file) {
   rd.readAsText(file, 'utf-8');
 }
 
+
+// ===== 端末の文字サイズ設定の打ち消し（カレンダー部分だけ。Android版の FixedFontScale と同じ考え方） =====
+// 実際に表示された文字の幅と、文字サイズ設定の影響を受けない canvas で測った幅を比べて倍率を求める
+function fixFontScale() {
+  try {
+    const fam = getComputedStyle(document.body).fontFamily;
+    const txt = '0123456789日月火水木金土年';
+    const sp = document.createElement('span');
+    sp.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:400 40px ${fam};`;
+    sp.textContent = txt; document.body.appendChild(sp);
+    const dom = sp.getBoundingClientRect().width; sp.remove();
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = `400 40px ${fam}`;
+    const ref = ctx.measureText(txt).width;
+    if (!(dom > 0 && ref > 0)) return;
+    const ratio = dom / ref;
+    const k = ratio > 1.04 ? 1 / ratio : 1;   // 大きくなっているときだけ縮める
+    document.documentElement.style.setProperty('--k', k.toFixed(3));
+  } catch (e) { /* 測れなければそのまま */ }
+}
+fixFontScale();
+window.addEventListener('resize', fixFontScale);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fixFontScale(); });
+
 // ===== 起動 =====
 (function start() {
   Weather.loadCached();
