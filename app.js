@@ -742,11 +742,18 @@ function renderSetting() {
       <div><button class="btn" id="penAdd">＋ 登録する</button></div>
     </div>
     <div class="card" style="background:#F0F8FF"><h2>💾 データのバックアップと復元</h2>
-      <div style="font-size:14px">データはこのiPhoneのブラウザ内に保存されています。機種変更やブラウザのデータ消去に備えて、ときどきバックアップを保存してください。Android版・Web版（出番ですョ!）のバックアップファイルからも復元できます。</div>
+      <div style="font-size:14px">データはこのスマホのブラウザ内に保存されています。機種変更やブラウザのデータ消去に備えて、ときどきバックアップを保存してください。Android版・Web版（出番ですョ!）のバックアップファイルからも復元できます。</div>
       <button class="btn wide" id="exp" style="background:#2196F3">📥 バックアップを保存</button>
+      <div style="font-size:13px;color:#555;margin-top:-2px">スマホの「ダウンロード」フォルダに保存されます。</div>
+      ${navigator.share ? '<div><button class="btn ghost" id="expShare" style="padding:4px 0;font-size:14px">☁️ Googleドライブなどに保存（共有）</button></div>' : ''}
       <button class="btn wide" id="imp" style="background:#FF9800">📤 バックアップから復元</button>
-      <input type="file" id="impFile" accept=".json,application/json,text/plain" hidden>
+      <div style="font-size:14px">${(() => { const m = backupMeta(); const c = inputCount(data);
+        const close = latestClose(), due = backupDue(m);
+        const st = due ? '<b style="color:#C53030">未保存</b>' : '<b style="color:#2F855A">保存済み ✅</b>';
+        const last = m ? `${jpDate(m.date)}（${daysSince(m.date) === 0 ? '今日' : daysSince(m.date) + '日前'}）${m.count}件 → 今 ${c}件` : `まだありません（今のデータ ${c}件）`;
+        return `${closeLabel(close)}の分：${st}<br><span style="font-size:13px;color:#555">最終バックアップ：${last}</span><br><span style="font-size:12px;color:#888">※ 毎月19日以降、その月の18日締めの分を保存するまでお知らせが出ます。</span>`; })()}</div>
       <div style="font-size:13px;color:#666">※ 復元しても今のデータは消えません。空いている日だけ、バックアップの内容を戻します。</div>
+      <div style="font-size:13px;color:#666">※ 機種変更の前は、保存したファイルを新しいスマホに移すか、Googleドライブなどに保存してください。</div>
     </div>
     <div class="card"><h2>🌤 天気</h2>
       <div style="font-size:14px">Open-Meteo（気象庁モデル優先）。予報は8時間ごとに自動更新、過去は実際の天気を表示します。地点：中央区役所付近</div>
@@ -773,36 +780,92 @@ function renderSetting() {
     const e = data.settings.pensionHistory.find(x => x.from === Number(b.dataset.pd));
     confirmDialog('削除しますか？', pensionLabel(e), '削除', () => { updateSettings(s => Object.assign(s, { pensionHistory: s.pensionHistory.filter(x => x.from !== e.from) })); renderSetting(); });
   });
-  v.querySelector('#exp').onclick = exportBackup;
-  const f = v.querySelector('#impFile');
-  v.querySelector('#imp').onclick = () => { f.value = ''; f.click(); };
-  f.addEventListener('change', () => {
-    const file = f.files && f.files[0]; if (!file) return;
-    confirmDialog('バックアップから復元しますか？', '今のデータは消えません。空いている日だけ、バックアップの内容を戻します。', '復元する', () => importBackup(file));
-  });
+  v.querySelector('#exp').onclick = () => exportBackup('download');
+  const es = v.querySelector('#expShare'); if (es) es.onclick = () => exportBackup('share');
+  v.querySelector('#imp').onclick = pickRestoreFile;
   v.querySelector('#wxBtn').onclick = () => Weather.refresh(true);
   renderSettingWeatherBtn();
 }
 
-function exportBackup() {
-  const json = Backup.export(data);
-  const name = 'taxiSales_' + todayIso().replace(/-/g, '') + '.json';
-  const file = new File([json], name, { type: 'application/json' });
-  // iPhone は共有シートから「ファイルに保存」できる
-  if (navigator.canShare && navigator.canShare({ files: [file] }) && /iPhone|iPad|iPod|Android/.test(navigator.userAgent)) {
-    navigator.share({ files: [file], title: name })
-      .then(() => toast('バックアップを保存しました ✅'))
-      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(file); });
+// ===== バックアップの見張り（空のデータで保存しない・忘れたら知らせる） =====
+const LS_BK = 'backup_meta';          // { date: 'YYYY-MM-DD', count: 件数 }
+const LS_BK_SNOOZE = 'backup_snooze'; // 「あとで」を押した日
+const LS_WELCOME = 'welcome_shown';
+/** 自分で入力した件数（日勤・夜勤で自動的に入る「出」「休」は数えない） */
+function inputCount(d) {
+  let n = 0;
+  for (const v of Object.values(d.sales)) if (String(v).trim() !== '') n++;
+  for (const [k, v] of Object.entries(d.dailyNight)) if (String(v).trim() !== '' && v !== Shift.dailyNightDefault(k)) n++;
+  return n;
+}
+function backupMeta() { try { return JSON.parse(lsGet(LS_BK) || 'null'); } catch (e) { return null; } }
+function daysSince(isoDate) { return toEpoch(todayIso()) - toEpoch(isoDate); }
+/** いちばん最近の締め日（18日）。19日からはその月の18日、18日まではその前の月の18日 */
+function latestClose(today) { const t = today || todayIso(); return dDay(t) >= 19 ? atDay(ymOf(t), 18) : atDay(ymOf(t) - 1, 18); }
+/** 締め日の分をまだ保存していないか（最後のバックアップが締め日以前なら未保存） */
+function backupDue(meta) { return !meta || meta.date <= latestClose(); }
+function closeLabel(close) { return `${dMonth(close)}月18日締め`; }
+function markBackedUp(count) { lsSet(LS_BK, JSON.stringify({ date: todayIso(), count })); }
+
+/** 保存の前の確認。問題なければそのまま保存する */
+/** mode: 'download'（ダウンロードフォルダに保存。標準）／'share'（共有画面からGoogleドライブなどへ） */
+function exportBackup(mode) {
+  mode = mode === 'share' ? 'share' : 'download';
+  const count = inputCount(data);
+  const meta = backupMeta();
+  if (count === 0) {
+    openDialog({
+      title: 'データがありません',
+      body: '<div>このブラウザには、まだ営収などの入力がありません。このまま保存すると<b>空のバックアップ</b>になります。</div>' +
+        '<div style="margin-top:8px">以前のデータがある場合は、先に「バックアップから復元」をしてください。</div>',
+      buttons: [{ label: 'やめる', cls: '' }, { label: '空のまま保存', cls: 'ghost danger', onClick: () => { doExport(count, mode); } }]
+    });
     return;
   }
-  downloadFile(file);
+  if (meta && meta.count >= 10 && count < meta.count / 2) {
+    openDialog({
+      title: '件数が大きく減っています',
+      body: `<div>前回のバックアップ（${jpDate(meta.date)}）：<b>${meta.count}件</b><br>今のデータ：<b>${count}件</b></div>` +
+        '<div style="margin-top:8px">データが消えている可能性があります。前回のバックアップファイルを残したまま、別のファイルとして保存しますか？</div>',
+      buttons: [{ label: 'やめる', cls: '' }, { label: '保存する', cls: 'ghost', onClick: () => { doExport(count, mode); } }]
+    });
+    return;
+  }
+  doExport(count, mode);
 }
-function downloadFile(file) {
+function doExport(count, mode) {
+  const json = Backup.export(data);
+  // 時刻も付けて、同じ日に何度保存しても名前がぶつからないようにする
+  const now = new Date();
+  const base = 'taxiSales_' + todayIso().replace(/-/g, '') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+  const jsonFile = () => new File([json], base + '.json', { type: 'application/json' });
+  if (mode !== 'share') { downloadFile(jsonFile(), count); return; }
+  // 「PC版サイト」表示にしていると端末名が隠れるので、指で操作する画面かどうかでも判定する
+  const mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
+  const can = f => { try { return !!(navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } };
+  // iPhone は .json のまま共有できる。Android の Chrome/Brave は .json を共有できないので .txt にする（中身は同じ）
+  // Android の Chrome は「共有できるか」の確認では .json も通すが、実際に送ると NotAllowedError で断る。
+  // そのため Android では最初から .txt で渡す
+  const android = /Android/.test(navigator.userAgent) || (mobile && !/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent));
+  let file = new File([json], base + '.json', { type: 'application/json' });
+  if (mobile && (android || !can(file))) file = new File([json], base + '.txt', { type: 'text/plain' });
+  if (mobile && can(file)) {
+    navigator.share({ files: [file], title: file.name })
+      .then(() => { markBackedUp(count); toast('保存しました ✅'); renderSetting(); })
+      .catch(e => { if (e && e.name !== 'AbortError') { toast('共有できなかったので、ダウンロードフォルダに保存します'); downloadFile(jsonFile(), count); } });
+    return;
+  }
+  toast('このブラウザでは共有できないので、ダウンロードフォルダに保存します');
+  downloadFile(jsonFile(), count);
+}
+function downloadFile(file, count) {
   try {
     const url = URL.createObjectURL(file);
     const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    toast('バックアップを保存しました ✅');
+    markBackedUp(count);
+    renderSetting();
+    setTimeout(() => toast(`ダウンロードフォルダに保存しました ✅（${file.name}）`), 300);
   } catch (e) { toast('バックアップに失敗しました ❌'); }
 }
 function importBackup(file) {
@@ -820,6 +883,44 @@ function importBackup(file) {
   rd.readAsText(file, 'utf-8');
 }
 
+
+// 復元用のファイル選択（起動時の案内からも使う）
+const restoreInput = document.createElement('input');
+restoreInput.type = 'file'; restoreInput.accept = '.json,.txt,application/json,text/plain'; restoreInput.hidden = true;
+document.body.appendChild(restoreInput);
+restoreInput.addEventListener('change', () => {
+  const file = restoreInput.files && restoreInput.files[0]; if (!file) return;
+  confirmDialog('バックアップから復元しますか？', '今のデータは消えません。空いている日だけ、バックアップの内容を戻します。', '復元する', () => importBackup(file));
+});
+function pickRestoreFile() { restoreInput.value = ''; restoreInput.click(); }
+
+/** 起動時の案内：初めてなら復元の案内、データがあってバックアップが古ければ保存の案内 */
+function backupCheck() {
+  if (document.querySelector('.ov') || currentView() !== 'cal') return;
+  const count = inputCount(data);
+  if (count === 0) {
+    if (lsGet(LS_WELCOME)) return;
+    lsSet(LS_WELCOME, '1');
+    openDialog({
+      title: 'はじめに',
+      body: '<div>以前に使っていたスマホやブラウザのデータがある場合は、先に<b>バックアップから復元</b>してください。</div>' +
+        '<div style="margin-top:8px;font-size:13px;color:#666">あとからでも ⚙設定 →「バックアップから復元」でできます。</div>',
+      buttons: [{ label: '新しく始める' }, { label: '復元する', cls: '', onClick: () => { pickRestoreFile(); } }]
+    });
+    return;
+  }
+  const meta = backupMeta();
+  if (!backupDue(meta)) return;
+  if (lsGet(LS_BK_SNOOZE) === todayIso()) return;
+  const close = latestClose();
+  const msg = `<b>${closeLabel(close)}</b>の分（${dMonth(atDay(ymOf(close) - 1, 19))}/19〜${dMonth(close)}/18）のバックアップがまだです。` +
+    (meta ? `<div style="font-size:13px;color:#666;margin-top:4px">前回のバックアップ：${jpDate(meta.date)}（${meta.count}件）</div>` : '<div style="font-size:13px;color:#666;margin-top:4px">まだ一度もバックアップしていません。</div>');
+  openDialog({
+    title: 'バックアップのお願い',
+    body: `<div>${msg}</div><div style="margin-top:8px">「今すぐ保存」を押すと、スマホの「ダウンロード」フォルダに保存されます。</div>`,
+    buttons: [{ label: 'あとで', onClick: () => { lsSet(LS_BK_SNOOZE, todayIso()); } }, { label: '今すぐ保存', cls: '', onClick: () => { exportBackup(); } }]
+  });
+}
 
 // ===== 端末の文字サイズ設定の打ち消し（カレンダー部分だけ。Android版の FixedFontScale と同じ考え方） =====
 // 実際に表示された文字の幅と、文字サイズ設定の影響を受けない canvas で測った幅を比べて倍率を求める
@@ -854,6 +955,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   setTitle(curYm);
   requestAnimationFrame(() => { scrollToMonth(curYm); setTitle(curYm); });
   Weather.refresh(false);
+  setTimeout(backupCheck, 800);
   // 日付が変わったら「今日」の印を付け直す
   let lastDay = todayIso();
   document.addEventListener('visibilitychange', () => {
