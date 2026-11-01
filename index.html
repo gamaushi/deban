@@ -66,7 +66,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 #months { padding: 0 max(4px, var(--safe-r)) calc(16px + var(--safe-b)) max(4px, var(--safe-l)); }
 .month { padding-bottom: 10px; }
 .mtitle { text-align: center; font-size: calc(16px * var(--k)); font-weight: 700; color: #333; padding: 3px 0; }
-.mtitle.now { color: var(--today); }
+.mtitle.now { background: var(--today); color: #fff; font-size: calc(18px * var(--k)); border-radius: 6px 6px 0 0; padding: 4px 0; }
+.mtitle .nowtag { display: inline-block; background: #fff; color: var(--today); font-size: calc(12px * var(--k)); border-radius: 10px; padding: 0 8px; margin-left: 6px; vertical-align: 2px; line-height: 1.6; }
 .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #fff; }
 .cell { min-height: 80px; border: .5px solid var(--grid); padding: 2px; display: flex; flex-direction: column;
   justify-content: space-between; align-items: center; overflow: hidden; position: relative; background: #fff; }
