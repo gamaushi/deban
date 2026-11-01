@@ -829,16 +829,19 @@ function exportBackup() {
 }
 function doExport(count) {
   const json = Backup.export(data);
-  const name = 'taxiSales_' + todayIso().replace(/-/g, '') + '.json';
-  const file = new File([json], name, { type: 'application/json' });
-  // iPhone は共有シートから「ファイルに保存」できる
-  if (navigator.canShare && navigator.canShare({ files: [file] }) && /iPhone|iPad|iPod|Android/.test(navigator.userAgent)) {
-    navigator.share({ files: [file], title: name })
+  const base = 'taxiSales_' + todayIso().replace(/-/g, '');
+  const mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
+  const can = f => { try { return !!(navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } };
+  // iPhone は .json のまま共有できる。Android の Chrome/Brave は .json を共有できないので .txt にする（中身は同じ）
+  let file = new File([json], base + '.json', { type: 'application/json' });
+  if (mobile && !can(file)) file = new File([json], base + '.txt', { type: 'text/plain' });
+  if (mobile && can(file)) {
+    navigator.share({ files: [file], title: file.name })
       .then(() => { markBackedUp(count); toast('バックアップを保存しました ✅'); renderSetting(); })
-      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(file, count); });
+      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(new File([json], base + '.json', { type: 'application/json' }), count); });
     return;
   }
-  downloadFile(file, count);
+  downloadFile(new File([json], base + '.json', { type: 'application/json' }), count);
 }
 function downloadFile(file, count) {
   try {
@@ -846,8 +849,17 @@ function downloadFile(file, count) {
     const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     markBackedUp(count);
-    toast('バックアップを保存しました ✅');
     renderSetting();
+    if (/Android|iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      // 共有画面が使えずスマホ本体に保存された：スマホをなくすと一緒に消えるので、移す方法を案内する
+      openDialog({
+        title: 'スマホ本体に保存しました',
+        body: `<div>「ダウンロード」フォルダに <b>${esc(file.name)}</b> を保存しました。</div>` +
+          '<div style="margin-top:8px">スマホの故障や紛失に備えて、Googleドライブにも移しておいてください。</div>' +
+          '<ol style="margin:8px 0 0;padding-left:1.3em;font-size:14px"><li>Googleドライブのアプリを開く</li><li>「＋」→「アップロード」</li><li>「ダウンロード」の中のこのファイルを選ぶ</li></ol>',
+        buttons: [{ label: 'OK', cls: '' }]
+      });
+    } else toast('バックアップを保存しました ✅');
   } catch (e) { toast('バックアップに失敗しました ❌'); }
 }
 function importBackup(file) {
@@ -868,7 +880,7 @@ function importBackup(file) {
 
 // 復元用のファイル選択（起動時の案内からも使う）
 const restoreInput = document.createElement('input');
-restoreInput.type = 'file'; restoreInput.accept = '.json,application/json,text/plain'; restoreInput.hidden = true;
+restoreInput.type = 'file'; restoreInput.accept = '.json,.txt,application/json,text/plain'; restoreInput.hidden = true;
 document.body.appendChild(restoreInput);
 restoreInput.addEventListener('change', () => {
   const file = restoreInput.files && restoreInput.files[0]; if (!file) return;
