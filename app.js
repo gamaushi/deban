@@ -744,6 +744,8 @@ function renderSetting() {
     <div class="card" style="background:#F0F8FF"><h2>💾 データのバックアップと復元</h2>
       <div style="font-size:14px">データはこのスマホのブラウザ内に保存されています。機種変更やブラウザのデータ消去に備えて、ときどきバックアップを保存してください。Android版・Web版（出番ですョ!）のバックアップファイルからも復元できます。</div>
       <button class="btn wide" id="exp" style="background:#2196F3">📥 バックアップを保存</button>
+      <div style="font-size:13px;color:#555;margin-top:-2px">スマホの「ダウンロード」フォルダに保存されます。</div>
+      ${navigator.share ? '<div><button class="btn ghost" id="expShare" style="padding:4px 0;font-size:14px">☁️ Googleドライブなどに保存（共有）</button></div>' : ''}
       <button class="btn wide" id="imp" style="background:#FF9800">📤 バックアップから復元</button>
       <div style="font-size:14px">${(() => { const m = backupMeta(); const c = inputCount(data);
         const close = latestClose(), due = backupDue(m);
@@ -751,6 +753,7 @@ function renderSetting() {
         const last = m ? `${jpDate(m.date)}（${daysSince(m.date) === 0 ? '今日' : daysSince(m.date) + '日前'}）${m.count}件 → 今 ${c}件` : `まだありません（今のデータ ${c}件）`;
         return `${closeLabel(close)}の分：${st}<br><span style="font-size:13px;color:#555">最終バックアップ：${last}</span><br><span style="font-size:12px;color:#888">※ 毎月19日以降、その月の18日締めの分を保存するまでお知らせが出ます。</span>`; })()}</div>
       <div style="font-size:13px;color:#666">※ 復元しても今のデータは消えません。空いている日だけ、バックアップの内容を戻します。</div>
+      <div style="font-size:13px;color:#666">※ 機種変更の前は、保存したファイルを新しいスマホに移すか、Googleドライブなどに保存してください。</div>
     </div>
     <div class="card"><h2>🌤 天気</h2>
       <div style="font-size:14px">Open-Meteo（気象庁モデル優先）。予報は8時間ごとに自動更新、過去は実際の天気を表示します。地点：中央区役所付近</div>
@@ -777,7 +780,8 @@ function renderSetting() {
     const e = data.settings.pensionHistory.find(x => x.from === Number(b.dataset.pd));
     confirmDialog('削除しますか？', pensionLabel(e), '削除', () => { updateSettings(s => Object.assign(s, { pensionHistory: s.pensionHistory.filter(x => x.from !== e.from) })); renderSetting(); });
   });
-  v.querySelector('#exp').onclick = exportBackup;
+  v.querySelector('#exp').onclick = () => exportBackup('download');
+  const es = v.querySelector('#expShare'); if (es) es.onclick = () => exportBackup('share');
   v.querySelector('#imp').onclick = pickRestoreFile;
   v.querySelector('#wxBtn').onclick = () => Weather.refresh(true);
   renderSettingWeatherBtn();
@@ -804,7 +808,9 @@ function closeLabel(close) { return `${dMonth(close)}月18日締め`; }
 function markBackedUp(count) { lsSet(LS_BK, JSON.stringify({ date: todayIso(), count })); }
 
 /** 保存の前の確認。問題なければそのまま保存する */
-function exportBackup() {
+/** mode: 'download'（ダウンロードフォルダに保存。標準）／'share'（共有画面からGoogleドライブなどへ） */
+function exportBackup(mode) {
+  mode = mode === 'share' ? 'share' : 'download';
   const count = inputCount(data);
   const meta = backupMeta();
   if (count === 0) {
@@ -812,7 +818,7 @@ function exportBackup() {
       title: 'データがありません',
       body: '<div>このブラウザには、まだ営収などの入力がありません。このまま保存すると<b>空のバックアップ</b>になります。</div>' +
         '<div style="margin-top:8px">以前のデータがある場合は、先に「バックアップから復元」をしてください。</div>',
-      buttons: [{ label: 'やめる', cls: '' }, { label: '空のまま保存', cls: 'ghost danger', onClick: () => { doExport(count); } }]
+      buttons: [{ label: 'やめる', cls: '' }, { label: '空のまま保存', cls: 'ghost danger', onClick: () => { doExport(count, mode); } }]
     });
     return;
   }
@@ -821,15 +827,19 @@ function exportBackup() {
       title: '件数が大きく減っています',
       body: `<div>前回のバックアップ（${jpDate(meta.date)}）：<b>${meta.count}件</b><br>今のデータ：<b>${count}件</b></div>` +
         '<div style="margin-top:8px">データが消えている可能性があります。前回のバックアップファイルを残したまま、別のファイルとして保存しますか？</div>',
-      buttons: [{ label: 'やめる', cls: '' }, { label: '保存する', cls: 'ghost', onClick: () => { doExport(count); } }]
+      buttons: [{ label: 'やめる', cls: '' }, { label: '保存する', cls: 'ghost', onClick: () => { doExport(count, mode); } }]
     });
     return;
   }
-  doExport(count);
+  doExport(count, mode);
 }
-function doExport(count) {
+function doExport(count, mode) {
   const json = Backup.export(data);
-  const base = 'taxiSales_' + todayIso().replace(/-/g, '');
+  // 時刻も付けて、同じ日に何度保存しても名前がぶつからないようにする
+  const now = new Date();
+  const base = 'taxiSales_' + todayIso().replace(/-/g, '') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+  const jsonFile = () => new File([json], base + '.json', { type: 'application/json' });
+  if (mode !== 'share') { downloadFile(jsonFile(), count); return; }
   // 「PC版サイト」表示にしていると端末名が隠れるので、指で操作する画面かどうかでも判定する
   const mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
   const can = f => { try { return !!(navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } };
@@ -841,31 +851,21 @@ function doExport(count) {
   if (mobile && (android || !can(file))) file = new File([json], base + '.txt', { type: 'text/plain' });
   if (mobile && can(file)) {
     navigator.share({ files: [file], title: file.name })
-      .then(() => { markBackedUp(count); toast('バックアップを保存しました ✅'); renderSetting(); })
-      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(new File([json], base + '.json', { type: 'application/json' }), count, '共有に失敗：' + e.name); });
+      .then(() => { markBackedUp(count); toast('保存しました ✅'); renderSetting(); })
+      .catch(e => { if (e && e.name !== 'AbortError') { toast('共有できなかったので、ダウンロードフォルダに保存します'); downloadFile(jsonFile(), count); } });
     return;
   }
-  const why = !mobile ? 'スマホと判定されませんでした（PC版サイト表示？）' : !navigator.share ? 'このブラウザには共有機能がありません' : !navigator.canShare ? 'このブラウザはファイルの共有に対応していません' : 'このブラウザでは .json も .txt も共有できません';
-  downloadFile(new File([json], base + '.json', { type: 'application/json' }), count, why);
+  toast('このブラウザでは共有できないので、ダウンロードフォルダに保存します');
+  downloadFile(jsonFile(), count);
 }
-function downloadFile(file, count, why) {
+function downloadFile(file, count) {
   try {
     const url = URL.createObjectURL(file);
     const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     markBackedUp(count);
     renderSetting();
-    if (/Android|iPhone|iPad|iPod/.test(navigator.userAgent) || navigator.maxTouchPoints > 0) {
-      // 共有画面が使えずスマホ本体に保存された：スマホをなくすと一緒に消えるので、移す方法を案内する
-      openDialog({
-        title: 'スマホ本体に保存しました',
-        body: `<div>「ダウンロード」フォルダに <b>${esc(file.name)}</b> を保存しました。</div>` +
-          '<div style="margin-top:8px">スマホの故障や紛失に備えて、Googleドライブにも移しておいてください。</div>' +
-          '<ol style="margin:8px 0 0;padding-left:1.3em;font-size:14px"><li>Googleドライブのアプリを開く</li><li>「＋」→「アップロード」</li><li>「ダウンロード」の中のこのファイルを選ぶ</li></ol>' +
-          (why ? `<div style="margin-top:8px;font-size:12px;color:#888">理由：${esc(why)}</div>` : ''),
-        buttons: [{ label: 'OK', cls: '' }]
-      });
-    } else toast('バックアップを保存しました ✅');
+    setTimeout(() => toast(`ダウンロードフォルダに保存しました ✅（${file.name}）`), 300);
   } catch (e) { toast('バックアップに失敗しました ❌'); }
 }
 function importBackup(file) {
@@ -917,7 +917,7 @@ function backupCheck() {
     (meta ? `<div style="font-size:13px;color:#666;margin-top:4px">前回のバックアップ：${jpDate(meta.date)}（${meta.count}件）</div>` : '<div style="font-size:13px;color:#666;margin-top:4px">まだ一度もバックアップしていません。</div>');
   openDialog({
     title: 'バックアップのお願い',
-    body: `<div>${msg}</div><div style="margin-top:8px">スマホの故障や機種変更でデータが消えないよう、保存しておきましょう。iPhoneは「"ファイル"に保存」→ iCloud Drive、Androidは Googleドライブ がおすすめです。</div>`,
+    body: `<div>${msg}</div><div style="margin-top:8px">「今すぐ保存」を押すと、スマホの「ダウンロード」フォルダに保存されます。</div>`,
     buttons: [{ label: 'あとで', onClick: () => { lsSet(LS_BK_SNOOZE, todayIso()); } }, { label: '今すぐ保存', cls: '', onClick: () => { exportBackup(); } }]
   });
 }
