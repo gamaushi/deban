@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="納金電卓">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFDF8">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>納金電卓</title>
+<style>
+:root{
+  color-scheme: light;
+  --paper:#FFFDF8; --ink:#1E1C19; --ink-soft:#6B675F; --rule:#D8D3C7;
+  --cash:#2F5D43; --cash-bg:#E7EFE8; --warn:#A13D2C;
+  --low-bg:#FFF1A8; --low-line:#D9B400;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  -webkit-text-size-adjust:100%;overscroll-behavior:none}
+body{display:flex;flex-direction:column;height:100dvh;
+  padding-top:env(safe-area-inset-top);user-select:none;-webkit-user-select:none}
+button{font:inherit;cursor:pointer}
+
+/* ---- 上の帯 ---- */
+header{display:flex;align-items:center;gap:8px;padding:8px 14px 6px;border-bottom:1px solid var(--rule)}
+header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
+.hbtn{border:1px solid var(--rule);background:#fff;border-radius:8px;padding:5px 11px;font-size:14px;color:var(--ink-soft)}
+
+/* ---- 項目一覧 ---- */
+#list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 14px 6px}
+.row{display:flex;align-items:center;min-height:42px;border-bottom:1px solid var(--rule);padding:2px 0}
+.row:active{background:#F3EFE4}
+.row .lab{flex:1;font-size:15px}
+.row .val{width:130px;text-align:right;font-size:18px;font-variant-numeric:tabular-nums;
+  padding:5px 8px;border:1px solid var(--rule);border-radius:6px;background:#fff;min-height:34px}
+.row.hand .val{font-style:italic;font-family:"Hiragino Mincho ProN",serif;color:var(--ink-soft)}
+.row .val.qq{color:var(--warn);font-weight:bold;font-style:normal}
+.row .val.low{background:var(--low-bg);border-color:var(--low-line)}
+.row.main{border-bottom:1.5px solid var(--ink-soft);min-height:50px}
+.row.main .lab{font-weight:bold;font-size:16px}
+.row.main .val{font-size:21px}
+.memo{text-align:right;font-size:12px;color:var(--ink-soft);padding:1px 4px 3px;display:none;word-break:break-all}
+.memo.show{display:block}
+
+/* ---- 下に固定 ---- */
+#bottom{border-top:1px solid var(--ink-soft);padding:8px 14px calc(10px + env(safe-area-inset-bottom));background:var(--paper)}
+#result{display:flex;align-items:center;background:var(--cash-bg);padding:8px 14px;border-radius:4px}
+#result .lab{flex:1;font-weight:bold;font-size:15px}
+#genkin{font-weight:bold;font-size:27px;color:var(--cash);font-variant-numeric:tabular-nums}
+#genkin.neg{color:var(--warn)}
+#warn{color:var(--warn);font-size:12px;margin-top:4px;display:none}
+#bar{display:flex;align-items:center;gap:8px;margin-top:7px}
+#thumb{width:44px;height:44px;object-fit:cover;border:1.5px solid var(--ink-soft);display:none;border-radius:3px}
+.bigbtn{flex:1;height:46px;border:1px solid;border-radius:8px;color:#fff;font-weight:bold;font-size:16px;
+  box-shadow:0 3px 0 rgba(0,0,0,.25)}
+.bigbtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+#shoot{background:linear-gradient(#9AA3AF,#6E7683);border-color:#575E68}
+#calcOpen{background:linear-gradient(#F7B96B,#E08A2E);border-color:#B5691C}
+#ver{font-size:11px;color:var(--ink-soft);text-align:center;white-space:pre-line;min-width:46px}
+
+/* ---- 共通の重ね表示 ---- */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:10;padding:10px}
+.overlay.show{display:flex}
+
+/* ---- 電卓 ---- */
+#calc{width:min(420px,100%);background:linear-gradient(#E4E5E3,#C8CAC7);border:1px solid #9A9C98;border-radius:18px;
+  padding:12px 9px 9px;position:relative;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#calcClose{position:absolute;top:-10px;right:-6px;width:34px;height:34px;border-radius:50%;border:2px solid #fff;
+  background:#555;color:#fff;font-weight:bold;font-size:18px;line-height:28px;padding:0}
+#disp{background:linear-gradient(#86BFD0,#6FB0C4);border:1.5px solid #3B4A52;border-radius:10px;padding:8px 12px;margin:0 5px 8px;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.25)}
+#expr{font-size:24px;color:#2B4F5C;min-height:32px;max-height:96px;overflow-y:auto;word-break:break-all;line-height:32px;
+  font-variant-numeric:tabular-nums}
+#expr span.c{display:inline}
+#expr .caret{display:inline-block;width:2px;height:26px;background:#0D2630;vertical-align:-5px;margin:0 -1px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+#dispBottom{display:flex;align-items:flex-end}
+#calcLabel{flex:1;font-weight:bold;font-size:16px;color:#2B4F5C;padding-bottom:6px}
+#calcResult{font-size:44px;color:#0D2630;font-variant-numeric:tabular-nums;line-height:1.1}
+.krow{display:flex}
+.k{flex:1;margin:5px;height:min(70px,9.2vh);border-radius:9px;border:1.5px solid;font-size:40px;line-height:1;padding:0 0 4px;
+  position:relative;box-shadow:0 4px 0 var(--edge)}
+.k:active,.k.down{transform:translateY(3px);box-shadow:0 1px 0 var(--edge)}
+.k.w2{flex:2.12}
+.k.num{--edge:#5F5E57;border-color:#5F5E57;background:linear-gradient(#F3F2EC,#C9C7BB);color:#1E1C19}
+.k.op{--edge:#4F5566;border-color:#4F5566;background:linear-gradient(#EEF0F7,#B9BDCC);color:#1E2433}
+.k.mut{--edge:#262A36;border-color:#262A36;background:linear-gradient(#8A90A3,#4D5367);color:#fff;font-size:32px}
+.k.red{--edge:#9C3128;border-color:#9C3128;background:linear-gradient(#F6B3AB,#DF6F64);color:#3A0A05}
+.k.ent{--edge:#A8520F;border-color:#A8520F;background:linear-gradient(#FFC98A,#F28C2E);color:#3A1C00;font-size:28px;font-weight:bold;letter-spacing:.08em}
+
+/* ---- 読み取り中 ---- */
+#busy{flex-direction:column;color:#fff;font-size:18px;gap:16px}
+.spin{width:44px;height:44px;border:5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;transition:opacity .25s}
+
+/* ---- 写真表示 ---- */
+#photoView{background:rgba(0,0,0,.9);flex-direction:column;padding:0}
+#photoScroll{flex:1;width:100%;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:center;justify-content:center}
+#photoImg{max-width:100%;max-height:100%}
+#photoScroll.zoom{display:block}
+#photoScroll.zoom #photoImg{max-width:none;max-height:none;width:250%}
+#photoBar{display:flex;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));width:100%}
+#photoBar button{flex:1;height:44px;border-radius:8px;border:1px solid #888;background:#333;color:#fff;font-size:15px}
+
+/* ---- 設定・確認 ---- */
+.panel{background:var(--paper);border-radius:12px;padding:16px;width:min(440px,100%);max-height:90dvh;overflow:auto;user-select:text;-webkit-user-select:text}
+.panel h2{font-size:17px;margin:0 0 10px}
+.panel label{display:block;font-size:13px;color:var(--ink-soft);margin:10px 0 3px}
+.panel input[type=text],.panel input[type=password]{width:100%;font-size:16px;padding:8px;border:1px solid var(--rule);border-radius:6px;background:#fff}
+.panel .chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin-top:12px}
+.panel .note{font-size:12px;color:var(--ink-soft);line-height:1.6;margin-top:10px}
+.panel .btns{display:flex;gap:10px;margin-top:16px}
+.panel .btns button{flex:1;height:44px;border-radius:8px;border:1px solid var(--rule);background:#fff;font-size:15px}
+.panel .btns button.pri{background:var(--cash);color:#fff;border-color:var(--cash)}
+.panel .btns button.dng{background:var(--warn);color:#fff;border-color:var(--warn)}
+
+#toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:88%;
+  background:rgba(30,28,25,.92);color:#fff;font-size:14px;line-height:1.5;padding:10px 16px;border-radius:10px;
+  white-space:pre-line;z-index:30;opacity:0;pointer-events:none;transition:opacity .25s}
+#toast.show{opacity:1}
+#file{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>納金電卓</h1>
+  <button class="hbtn" id="clearBtn">クリア</button>
+  <button class="hbtn" id="setBtn" aria-label="設定">⚙ 設定</button>
+</header>
+
+<div id="list"></div>
+
+<div id="bottom">
+  <div id="result"><span class="lab">現金納金額</span><span id="genkin">0円</span></div>
+  <div id="warn"></div>
+  <div id="bar">
+    <img id="thumb" alt="撮影した写真">
+    <button class="bigbtn" id="shoot">撮影</button>
+    <button class="bigbtn" id="calcOpen">電卓</button>
+    <div id="ver"></div>
+  </div>
+</div>
+
+<input type="file" id="file" accept="image/*" capture="environment">
+
+<!-- 電卓 -->
+<div class="overlay" id="calcView">
+  <div id="calc">
+    <button id="calcClose" aria-label="閉じる">×</button>
+    <div id="disp">
+      <div id="expr"></div>
+      <div id="dispBottom"><span id="calcLabel">電卓</span><span id="calcResult">0</span></div>
+    </div>
+    <div class="krow"><button class="k num" data-k="7">7</button><button class="k num" data-k="8">8</button><button class="k num" data-k="9">9</button><button class="k mut" data-k="BS">⌫</button></div>
+    <div class="krow"><button class="k num" data-k="4">4</button><button class="k num" data-k="5">5</button><button class="k num" data-k="6">6</button><button class="k red" data-k="C">C</button></div>
+    <div class="krow"><button class="k num" data-k="1">1</button><button class="k num" data-k="2">2</button><button class="k num" data-k="3">3</button><button class="k op" data-k="+">+</button></div>
+    <div class="krow"><button class="k num" data-k="0">0</button><button class="k op" data-k="×">×</button><button class="k op" data-k="÷">÷</button><button class="k op" data-k="-">−</button></div>
+    <div class="krow"><button class="k mut" data-k="L">←</button><button class="k mut" data-k="R">→</button><button class="k ent w2" data-k="ENTER">ENTER</button></div>
+  </div>
+</div>
+
+<!-- 読み取り中 -->
+<div class="overlay" id="busy"><div class="spin"></div><div id="busyText">読み取り中…</div></div>
+<div id="flash"></div>
+
+<!-- 写真 -->
+<div class="overlay" id="photoView">
+  <div id="photoScroll"><img id="photoImg" alt="撮影した写真"></div>
+  <div id="photoBar"><button id="photoZoom">拡大</button><button id="photoClose">閉じる</button></div>
+</div>
+
+<!-- 設定 -->
+<div class="overlay" id="setView">
+  <div class="panel">
+    <h2>設定（手書きの読み取り：Azure AI Vision）</h2>
+    <label for="ep">エンドポイント</label>
+    <input type="text" id="ep" placeholder="https://(リソース名).cognitiveservices.azure.com/" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label for="key">キー（キー1）</label>
+    <input type="password" id="key" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="chk"><input type="checkbox" id="showKey"><label for="showKey" style="margin:0;color:inherit;font-size:14px">キーを表示する</label></div>
+    <div class="chk"><input type="checkbox" id="useLocal"><label for="useLocal" style="margin:0;color:inherit;font-size:14px">Azureが使えない時は端末で読み取る</label></div>
+    <div class="note">
+      ・キーはこのスマホの中（ブラウザ）にだけ保存され、外には送りません（Azureへの読み取り依頼を除く）。<br>
+      ・無料プラン(F0)は月5,000回・1分20回まで。上限を超えても課金はされません。<br>
+      ・「端末で読み取る」は印刷文字のみ・精度は低めです。初回だけ読み取り用データ（数MB）をダウンロードします。<br>
+      ・キーが未設定でも、電卓での手入力は使えます。
+    </div>
+    <div class="btns"><button id="setCancel">閉じる</button><button class="pri" id="setSave">保存</button></div>
+  </div>
+</div>
+
+<!-- 確認 -->
+<div class="overlay" id="askView">
+  <div class="panel">
+    <h2 id="askText">すべての金額を消しますか？</h2>
+    <div class="btns"><button id="askNo">やめる</button><button class="dng" id="askYes">消す</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const VERSION = 'v5.0 (Web版)';
+
+/* ============================================================
+   項目の定義（日報に表示される順番）
+   ============================================================ */
+const FIELDS = [
+  {id:'nokin',      name:'納金額',           main:true},
+  {id:'etcKiro',    name:'ETC帰路請求',      hand:true},
+  {id:'ticket',     name:'チケット'},
+  {id:'credit',     name:'クレジット/キャブ'},
+  {id:'id',         name:'iD'},
+  {id:'ic',         name:'交通系IC'},
+  {id:'waon',       name:'WAON'},
+  {id:'nanaco',     name:'nanaco'},
+  {id:'quicpay',    name:'QUICPay'},
+  {id:'net',        name:'ネット決済'},
+  {id:'coupon',     name:'クーポン券',       hand:true},
+  {id:'welfare',    name:'福祉券',           hand:true},
+  {id:'cancel',     name:'キャンセル(会社)', hand:true},
+  {id:'disability', name:'障害者割引'}
+];
+const FIELD_NAME = Object.fromEntries(FIELDS.map(f => [f.id, f.name]));
+const DEDUCTION_KEYS = FIELDS.filter(f => f.id !== 'nokin').map(f => f.id);
+
+/* ============================================================
+   保存（Safariが裏でページを読み直しても数字が消えないように）
+   ============================================================ */
+const STORE_KEY = 'nokin_state_v1';
+const CONF_KEY  = 'nokin_azure_v1';
+function load(k, def){ try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : def; }catch(e){ return def; } }
+function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+// state.values[id] = 文字列（"" / "1234" / "???"）、memos[id] = 計算式、low = 黄色の項目
+let state = load(STORE_KEY, null) || {values:{}, memos:{}, low:[], engine:''};
+state.values ||= {}; state.memos ||= {}; state.low ||= [];
+let conf = load(CONF_KEY, {ep:'', key:'', useLocal:true});
+
+/* ============================================================
+   画面づくり
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const listEl = $('list');
+const rowEls = {}, valEls = {}, memoEls = {};
+
+for (const f of FIELDS){
+  const row = document.createElement('div');
+  row.className = 'row' + (f.main ? ' main' : '') + (f.hand ? ' hand' : '');
+  row.innerHTML = `<span class="lab">${f.name}</span><span class="val"></span>`;
+  const memo = document.createElement('div');
+  memo.className = 'memo';
+  row.addEventListener('click', () => openCalc(f.id));
+  listEl.append(row, memo);
+  rowEls[f.id] = row; valEls[f.id] = row.querySelector('.val'); memoEls[f.id] = memo;
+}
+
+function fmt(n){ return n.toLocaleString('ja-JP'); }
+
+function render(){
+  for (const f of FIELDS){
+    const v = state.values[f.id] ?? '';
+    const el = valEls[f.id];
+    el.textContent = (v === '' || v === '???') ? v : fmt(Number(v));
+    el.classList.toggle('qq', v === '???');
+    el.classList.toggle('low', state.low.includes(f.id));
+    const m = state.memos[f.id];
+    memoEls[f.id].textContent = m || '';
+    memoEls[f.id].classList.toggle('show', !!m);
+  }
+  recalc();
+  $('ver').textContent = VERSION.replace(' ', '\n') + (state.engine ? '\n' + state.engine : '');
+  save(STORE_KEY, state);
+}
+
+function readInt(id){
+  const t = String(state.values[id] ?? '');
+  const digits = t.replace(/\D/g, '').slice(0, 15);
+  const n = digits ? Number(digits) : 0;
+  return t.trim().startsWith('-') ? -n : n;
+}
+
+function recalc(){
+  const nokin = readInt('nokin');
+  const ded = DEDUCTION_KEYS.reduce((s, k) => s + readInt(k), 0);
+  const genkin = nokin - ded;
+  const g = $('genkin');
+  g.textContent = fmt(genkin) + '円';
+  g.classList.toggle('neg', genkin < 0);
+  const w = $('warn');
+  if (genkin < 0){ w.textContent = '現金納金額がマイナスです。数字を確認してください'; w.style.display = 'block'; }
+  else { w.textContent = ''; w.style.display = 'none'; }
+}
+
+/* ---- お知らせ ---- */
+let toastTimer = 0;
+function toast(msg, ms = 3500){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+function show(id, on){ $(id).classList.toggle('show', on); }
+
+/* ============================================================
+   簡易電卓
+   ============================================================ */
+const MAX_DIGITS = 12;               // 1つの数字の最大桁数
+const MAX_RESULT = 999999999999999;  // これを超えたらエラー
+const isOp = c => c === '+' || c === '-' || c === '×' || c === '÷';
+
+/** 「4600+200×3÷2」を計算して円単位(四捨五入)で返す。おかしい時は null */
+function evaluate(expr){
+  let s = expr.replace(/\*/g,'×').replace(/\//g,'÷').replace(/−/g,'-').replace(/\s/g,'');
+  while (s && isOp(s[s.length-1])) s = s.slice(0, -1);
+  if (!s) return 0;
+  let i = 0;
+  const num = () => {
+    let sign = 1;
+    while (i < s.length && (s[i] === '+' || s[i] === '-')){ if (s[i] === '-') sign = -sign; i++; }
+    const st = i;
+    while (i < s.length && s[i] >= '0' && s[i] <= '9') i++;
+    if (st === i) return null;
+    return Number(s.slice(st, i)) * sign;
+  };
+  const term = () => {
+    let v = num(); if (v === null) return null;
+    while (i < s.length && (s[i] === '×' || s[i] === '÷')){
+      const op = s[i++]; const r = num(); if (r === null) return null;
+      if (op === '×') v = v * r; else { if (r === 0) return null; v = v / r; }
+      if (Math.abs(v) > MAX_RESULT) return null;
+    }
+    return v;
+  };
+  let total = term(); if (total === null) return null;
+  while (i < s.length){
+    const op = s[i++]; if (op !== '+' && op !== '-') return null;
+    const r = term(); if (r === null) return null;
+    total = op === '+' ? total + r : total - r;
+    if (Math.abs(total) > MAX_RESULT) return null;
+  }
+  // 四捨五入(マイナスは0から遠い方へ。Android版のHALF_UPと同じ)。小数の誤差を少し吸収
+  const a = Math.abs(total);
+  const r = Math.floor(a + 0.5 + 1e-9);
+  return total < 0 ? -r : r;
+}
+
+let calcField = null, cExpr = '', cPos = 0;
+
+function openCalc(fieldId){
+  calcField = fieldId;
+  const cur = fieldId ? String(state.values[fieldId] ?? '') : '';
+  cExpr = (cur && cur !== '???') ? cur : '';
+  cPos = cExpr.length;
+  $('calcLabel').textContent = fieldId ? FIELD_NAME[fieldId] : '電卓';
+  drawCalc();
+  show('calcView', true);
+}
+function closeCalc(){ show('calcView', false); calcField = null; }
+
+function drawCalc(){
+  const ex = $('expr');
+  let h = '';
+  for (let i = 0; i <= cExpr.length; i++){
+    if (i === cPos) h += '<span class="caret"></span>';
+    if (i < cExpr.length){
+      const ch = cExpr[i] === '-' ? '−' : cExpr[i];
+      h += `<span class="c" data-i="${i}">${ch}</span>`;
+    }
+  }
+  ex.innerHTML = h;
+  const r = evaluate(cExpr);
+  $('calcResult').textContent = r === null ? 'エラー' : fmt(r);
+  const caret = ex.querySelector('.caret');
+  if (caret) caret.scrollIntoView({block:'nearest'});
+}
+
+// 式の文字をタップすると、そこにカーソルを移す
+$('expr').addEventListener('click', e => {
+  const c = e.target.closest('span.c');
+  if (!c){ cPos = cExpr.length; drawCalc(); return; }
+  const rect = c.getBoundingClientRect();
+  const i = Number(c.dataset.i);
+  cPos = (e.clientX < rect.left + rect.width / 2) ? i : i + 1;
+  drawCalc();
+});
+
+function insert(s){ cExpr = cExpr.slice(0, cPos) + s + cExpr.slice(cPos); cPos += s.length; }
+function insertDigit(d){
+  let st = cPos, en = cPos;
+  while (st > 0 && /\d/.test(cExpr[st-1])) st--;
+  while (en < cExpr.length && /\d/.test(cExpr[en])) en++;
+  if (en - st >= MAX_DIGITS){ toast(`1つの数字は${MAX_DIGITS}桁までです`, 1800); return; }
+  insert(d);
+}
+
+function calcKey(k){
+  if (/^\d$/.test(k)) insertDigit(k);
+  else if (isOp(k)) insert(k);
+  else if (k === 'L') cPos = Math.max(0, cPos - 1);
+  else if (k === 'R') cPos = Math.min(cExpr.length, cPos + 1);
+  else if (k === 'BS'){ if (cPos > 0){ cExpr = cExpr.slice(0, cPos-1) + cExpr.slice(cPos); cPos--; } }
+  else if (k === 'C'){ cExpr = ''; cPos = 0; }
+  else if (k === 'ENTER'){ enterCalc(); return; }
+  drawCalc();
+}
+
+function enterCalc(){
+  const r = evaluate(cExpr);
+  if (r === null){ toast('式を確認してください（0で割った・桁が大きすぎる等）', 2500); return; }
+  if (calcField){
+    const f = calcField;
+    // 空のままENTERなら空欄に戻す（手書き項目の「???」を消したい時など）
+    state.values[f] = cExpr === '' ? '' : String(r);
+    state.memos[f] = [...cExpr].some(isOp) ? `${cExpr.replace(/-/g,'−')} = ${fmt(r)}` : '';
+    state.low = state.low.filter(x => x !== f);   // 直した＝確認済みなので黄色を消す
+    render();
+  }
+  closeCalc();
+}
+
+// キーは押した瞬間に反応させる（iPhoneのタップ遅延・ダブルタップ拡大を避ける）
+document.querySelectorAll('.k').forEach(b => {
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('down'); calcKey(b.dataset.k); });
+  const up = () => b.classList.remove('down');
+  b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
+});
+$('calcClose').addEventListener('click', closeCalc);
+$('calcView').addEventListener('click', e => { if (e.target.id === 'calcView') closeCalc(); });
+$('calcOpen').addEventListener('click', () => openCalc(null));
+
+/* ============================================================
+   日報の読み取り結果から金額を取り出す（Android版 OcrFieldParser の移植）
+   ============================================================ */
+const LOW_CONFIDENCE = 0.8;
+
+const LABEL_SPECS = {
+  nokin:      {keywords:['納金額'], exclude:['現金']},
+  ticket:     {keywords:['チケット']},
+  credit:     {keywords:['クレジットカード','キャブカード','クレジット','キャブ'], tol:2.2},
+  id:         {keywords:['iD']},
+  ic:         {keywords:['交通系ICカード','交通系IC']},
+  waon:       {keywords:['WAON']},
+  nanaco:     {keywords:['nanaco','ナナコ']},
+  quicpay:    {keywords:['QUICPay','QUICPAY','クイックペイ']},
+  net:        {keywords:['ネット決済']},
+  disability: {keywords:['障害者割引','障碍者割引']}
+};
+const MANUAL_SPECS = {
+  etcKiro: {keywords:['ETC帰路請求','ETC帰路']},
+  coupon:  {keywords:['クーポン券','クーポン']},
+  welfare: {keywords:['福祉券'], rightmost:true},
+  cancel:  {keywords:['キャンセル']}
+};
+const HAND_IDS = Object.keys(MANUAL_SPECS);
+const HANDWRITING_ORDER = ['nokin','etcKiro','ticket','credit','id','ic','waon','nanaco','quicpay','net','coupon','welfare','cancel','disability'];
+
+const normalize = s => s.normalize('NFKC').replace(/\s+/g, '');
+const has = (text, kw) => text.toLowerCase().includes(kw.toLowerCase());
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const removeKw = (text, kw) => text.replace(new RegExp(escRe(kw), 'gi'), '');
+const isPlausible = n => n !== null && (n === 0 || n >= 10);   // 1桁(0以外)はノイズ扱い
+const looksWritten = t => /[0-9０-９]/.test(t);
+
+function toInt(raw){
+  const d = raw.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '');
+  if (!d) return null;
+  const n = Number(d);
+  return n > 2147483647 ? null : n;
+}
+/** 文字列から金額らしい数字を探す（「8枚」は飛ばす、1つ目がダメでも次を試す） */
+function extractAmount(text){
+  const re = /[0-9０-９][0-9０-９,，]*/g; let m;
+  while ((m = re.exec(text))){
+    if (text[m.index + m[0].length] === '枚') continue;
+    const n = toInt(m[0]);
+    if (isPlausible(n)) return n;
+  }
+  return null;
+}
+
+/**
+ * @param ocrLines [{text, top, bottom, left, confidence(0〜1またはnull)}]
+ * @param handwritingCapable Azureの時 true（手書き項目も金額を読む）
+ */
+function parseLines(ocrLines, handwritingCapable){
+  const lines = ocrLines.map(o => ({
+    text: normalize(o.text), top:o.top, bottom:o.bottom, left:o.left,
+    confidence: o.confidence ?? null, used:false,
+    centerY: Math.floor((o.top + o.bottom) / 2), height: Math.max(o.bottom - o.top, 1)
+  }));
+  const findLabel = spec => lines.find(l =>
+    !(spec.exclude || []).some(ex => l.text.includes(ex)) && spec.keywords.some(kw => has(l.text, kw)));
+
+  const specs = handwritingCapable
+    ? HANDWRITING_ORDER.map(id => [id, LABEL_SPECS[id] || MANUAL_SPECS[id]])
+    : Object.entries(LABEL_SPECS);
+
+  const amounts = {}, confBy = {}, labelLineBy = {};
+
+  for (const [fid, spec] of specs){
+    const label = findLabel(spec);
+    if (!label) continue;
+    labelLineBy[fid] = label;
+    const kw = spec.keywords.find(k => has(label.text, k));
+
+    // 1) ラベルと同じ行に数字があるか
+    let amount = extractAmount(removeKw(label.text, kw));
+    let src = amount !== null ? label : null;
+
+    // 2) 高さが近い、ラベルより右の、まだ使っていない行から探す
+    if (amount === null){
+      const tol = label.height * (spec.tol ?? 0.55);
+      let cands = lines.filter(o => o !== label && !o.used
+        && Math.abs(o.centerY - label.centerY) <= tol
+        && o.left > label.left
+        && extractAmount(o.text) !== null);
+      if (spec.rightmost) cands.sort((a, b) => b.left - a.left);
+      else cands.sort((a, b) => Math.abs(a.centerY - label.centerY) - Math.abs(b.centerY - label.centerY));
+      const c = cands[0];
+      if (c){ amount = extractAmount(c.text); c.used = true; src = c; }
+    } else {
+      label.used = true;
+    }
+    if (amount !== null){
+      amounts[fid] = amount;
+      if (src && src.confidence !== null) confBy[fid] = src.confidence;
+    }
+  }
+
+  // 最後の手段：クレジットが見つからなければ「チケット」と「iD」の間の数字(1つに絞れる時だけ)
+  if (!('credit' in amounts)){
+    const t = labelLineBy.ticket, d = labelLineBy.id;
+    if (t && d && d.centerY > t.centerY){
+      const between = lines.filter(l => !l.used && l.centerY > t.centerY && l.centerY < d.centerY
+        && l.left > t.left && extractAmount(l.text) !== null);
+      if (between.length === 1){
+        const l = between[0];
+        amounts.credit = extractAmount(l.text); l.used = true;
+        if (l.confidence !== null) confBy.credit = l.confidence;
+      }
+    }
+  }
+
+  // 手書き項目（端末の読み取りの時）：金額は読まず「何か書いてありそうか」だけ見る
+  const needsManual = [];
+  if (!handwritingCapable){
+    for (const [fid, spec] of Object.entries(MANUAL_SPECS)){
+      const label = lines.find(l => spec.keywords.some(kw => has(l.text, kw)));
+      if (!label) continue;
+      const kw = spec.keywords.find(k => has(label.text, k));
+      let written = looksWritten(removeKw(label.text, kw));
+      if (!written){
+        const tol = label.height * 0.55;
+        written = lines.some(o => o !== label && !o.used && Math.abs(o.centerY - label.centerY) <= tol
+          && o.left > label.left && looksWritten(o.text));
+      }
+      if (written) needsManual.push(fid);
+    }
+  }
+
+  const low = Object.keys(confBy).filter(k => confBy[k] < LOW_CONFIDENCE);
+  return {amounts, needsManual, low};
+}
+
+/* ============================================================
+   撮影 → 読み取り
+   ============================================================ */
+const MAX_SIDE = 2400;   // 送る写真の長い辺の最大ピクセル
+let lastPhotoUrl = null;
+
+$('shoot').addEventListener('click', () => { $('file').value = ''; $('file').click(); });
+$('file').addEventListener('change', async e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  flash();
+  setBusy(true, '写真を準備中…');
+  try{
+    const canvas = await fileToCanvas(file);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+    if (lastPhotoUrl) URL.revokeObjectURL(lastPhotoUrl);
+    lastPhotoUrl = URL.createObjectURL(blob);
+    $('thumb').src = lastPhotoUrl; $('thumb').style.display = 'block';
+    await runOcr(blob, canvas);
+  }catch(err){
+    console.error(err);
+    toast('写真を読み込めませんでした。もう一度撮影してください');
+  }finally{
+    setBusy(false);
+  }
+});
+
+function fileToCanvas(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      // iPhoneの写真の向き(EXIF)はSafariが自動で反映する
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const sc = Math.min(1, MAX_SIDE / Math.max(w, h));
+      const c = document.createElement('canvas');
+      c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load')); };
+    img.src = url;
+  });
+}
+
+const azureReady = () => !!(conf.ep && conf.key);
+
+async function runOcr(blob, canvas){
+  if (azureReady()){
+    setBusy(true, '読み取り中…');
+    const r = await azureRecognize(blob);
+    if (r.ok){ applyResult(parseLines(r.lines, true), 'Azure', true); return; }
+    if (!conf.useLocal){ toast(r.reason + '。金額は電卓で入力してください', 4500); return; }
+    toast(r.reason + '。端末の読み取りを使います', 3500);
+    await localRecognize(canvas, '端末');
+    return;
+  }
+  if (!conf.useLocal){
+    toast('読み取りの設定がありません。⚙設定でAzureのキーを入れてください', 4500);
+    return;
+  }
+  await localRecognize(canvas, '端末(キー未設定)');
+}
+
+/** Azure AI Vision (Image Analysis 4.0 Read) */
+async function azureRecognize(blob){
+  const url = conf.ep.trim().replace(/\/+$/, '') +
+    '/computervision/imageanalysis:analyze?api-version=2024-02-01&features=read';
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 25000);
+  try{
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Ocp-Apim-Subscription-Key':conf.key.trim(), 'Content-Type':'application/octet-stream'},
+      body: blob, signal: ctl.signal
+    });
+    if (res.status === 403 || res.status === 429) return {ok:false, reason:'手書き読み取りの無料枠の上限に達しました'};
+    if (res.status === 401) return {ok:false, reason:'Azureのキーが正しくありません'};
+    if (res.status === 404) return {ok:false, reason:'Azureのエンドポイントが正しくありません'};
+    if (!res.ok) return {ok:false, reason:`Azureの読み取りに失敗しました(コード${res.status})`};
+    const body = await res.json();
+    return {ok:true, lines: parseAzure(body)};
+  }catch(e){
+    return {ok:false, reason:'Azureと通信できませんでした'};
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+function parseAzure(body){
+  const out = [];
+  const blocks = (body.readResult && body.readResult.blocks) || [];
+  for (const b of blocks){
+    for (const line of (b.lines || [])){
+      const poly = line.boundingPolygon || [];
+      if (!poly.length) continue;
+      const xs = poly.map(p => p.x), ys = poly.map(p => p.y);
+      // 数字を含む単語の確信度のうち、いちばん低いもの
+      let conf = null;
+      for (const w of (line.words || [])){
+        if (!/\d/.test(w.text || '')) continue;
+        if (typeof w.confidence !== 'number') continue;
+        conf = conf === null ? w.confidence : Math.min(conf, w.confidence);
+      }
+      out.push({text: line.text || '', top: Math.min(...ys), bottom: Math.max(...ys), left: Math.min(...xs), confidence: conf});
+    }
+  }
+  return out;
+}
+
+/** 端末内での読み取り（Tesseract.js。印刷文字向け） */
+let tessWorker = null;
+async function localRecognize(canvas, label){
+  try{
+    if (!tessWorker){
+      setBusy(true, '端末の読み取りを準備中…\n（初回は数MBダウンロードします）');
+      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+      tessWorker = await Tesseract.createWorker('jpn');
+    }
+    setBusy(true, '読み取り中…');
+    const {data} = await tessWorker.recognize(canvas);
+    const lines = (data.lines || []).map(l => ({
+      text: l.text || '', top: l.bbox.y0, bottom: l.bbox.y1, left: l.bbox.x0, confidence: null
+    }));
+    applyResult(parseLines(lines, false), label, false);
+  }catch(e){
+    console.error(e);
+    toast('文字を読み取れませんでした。もう一度撮影するか、電卓で入力してください', 4500);
+  }
+}
+
+function loadScript(src){
+  return new Promise((ok, ng) => {
+    if (window.Tesseract) return ok();
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = () => ng(new Error('script'));
+    document.head.appendChild(s);
+  });
+}
+
+function applyResult(res, engine, handwritingCapable){
+  for (const f of FIELDS){
+    state.memos[f.id] = '';   // 撮り直したら前の電卓メモは古いので消す
+    if (res.needsManual.includes(f.id)) state.values[f.id] = '???';
+    else state.values[f.id] = (f.id in res.amounts) ? String(res.amounts[f.id]) : '';
+  }
+  state.low = res.low.slice();
+  state.engine = engine;
+  render();
+  listEl.scrollTop = 0;
+
+  const missing = FIELDS.map(f => f.id)
+    .filter(id => !(id in res.amounts) && !res.needsManual.includes(id))
+    .filter(id => !(handwritingCapable && HAND_IDS.includes(id)));
+  const msgs = [];
+  if (missing.length) msgs.push('読み取れなかった項目があります。空欄を確認してください');
+  if (res.low.length) msgs.push('黄色の数字は読み取りに自信がありません。日報と見比べてください');
+  if (res.needsManual.length) msgs.push('赤い「???」は手書きの欄です。電卓で入力してください');
+  if (msgs.length) toast(msgs.join('\n'), 5000);
+}
+
+function setBusy(on, msg){
+  if (msg) $('busyText').textContent = msg;
+  show('busy', on);
+  $('busyText').style.whiteSpace = 'pre-line';
+}
+function flash(){
+  const f = $('flash'); f.style.transition = 'none'; f.style.opacity = '0.8';
+  requestAnimationFrame(() => { f.style.transition = 'opacity .25s'; f.style.opacity = '0'; });
+}
+
+/* ---- 写真を見る ---- */
+$('thumb').addEventListener('click', () => {
+  if (!lastPhotoUrl) return;
+  $('photoImg').src = lastPhotoUrl;
+  $('photoScroll').classList.remove('zoom'); $('photoZoom').textContent = '拡大';
+  show('photoView', true);
+});
+$('photoZoom').addEventListener('click', () => {
+  const z = $('photoScroll').classList.toggle('zoom');
+  $('photoZoom').textContent = z ? '全体' : '拡大';
+});
+$('photoClose').addEventListener('click', () => show('photoView', false));
+
+/* ============================================================
+   設定・クリア
+   ============================================================ */
+$('setBtn').addEventListener('click', () => {
+  $('ep').value = conf.ep; $('key').value = conf.key; $('useLocal').checked = conf.useLocal !== false;
+  $('showKey').checked = false; $('key').type = 'password';
+  show('setView', true);
+});
+$('showKey').addEventListener('change', e => { $('key').type = e.target.checked ? 'text' : 'password'; });
+$('setCancel').addEventListener('click', () => show('setView', false));
+$('setSave').addEventListener('click', () => {
+  const ep = $('ep').value.trim();
+  if (ep && !/^https:\/\//i.test(ep)){ toast('エンドポイントは https:// で始まるURLを入れてください'); return; }
+  conf = {ep, key:$('key').value.trim(), useLocal:$('useLocal').checked};
+  save(CONF_KEY, conf);
+  show('setView', false);
+  toast(azureReady() ? 'Azureの設定を保存しました' : '保存しました（Azureは未設定）', 2200);
+});
+
+$('clearBtn').addEventListener('click', () => show('askView', true));
+$('askNo').addEventListener('click', () => show('askView', false));
+$('askYes').addEventListener('click', () => {
+  state = {values:{}, memos:{}, low:[], engine:''};
+  render(); show('askView', false); listEl.scrollTop = 0;
+});
+
+/* ---- URLで設定を受け取る（#ep=...&key=... で開くと保存してURLから消す） ---- */
+(function(){
+  if (!location.hash || location.hash.length < 2) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (!p.has('key') && !p.has('ep')) return;
+  conf = {ep: p.get('ep') || conf.ep, key: p.get('key') || conf.key, useLocal: conf.useLocal !== false};
+  save(CONF_KEY, conf);
+  history.replaceState(null, '', location.pathname + location.search);
+  setTimeout(() => toast('Azureの設定を保存しました'), 300);
+})();
+
+// iPhoneでダブルタップ拡大を防ぐ
+document.addEventListener('dblclick', e => e.preventDefault(), {passive:false});
+
+render();
+</script>
+</body>
+</html>
