@@ -742,10 +742,13 @@ function renderSetting() {
       <div><button class="btn" id="penAdd">＋ 登録する</button></div>
     </div>
     <div class="card" style="background:#F0F8FF"><h2>💾 データのバックアップと復元</h2>
-      <div style="font-size:14px">データはこのiPhoneのブラウザ内に保存されています。機種変更やブラウザのデータ消去に備えて、ときどきバックアップを保存してください。Android版・Web版（出番ですョ!）のバックアップファイルからも復元できます。</div>
+      <div style="font-size:14px">データはこのスマホのブラウザ内に保存されています。機種変更やブラウザのデータ消去に備えて、ときどきバックアップを保存してください。Android版・Web版（出番ですョ!）のバックアップファイルからも復元できます。</div>
       <button class="btn wide" id="exp" style="background:#2196F3">📥 バックアップを保存</button>
       <button class="btn wide" id="imp" style="background:#FF9800">📤 バックアップから復元</button>
-      <input type="file" id="impFile" accept=".json,application/json,text/plain" hidden>
+      <div style="font-size:14px">${(() => { const m = backupMeta(); const c = inputCount(data);
+        if (!m) return `最終バックアップ：<b style="color:#C53030">まだありません</b>（今のデータ ${c}件）`;
+        const d = daysSince(m.date);
+        return `最終バックアップ：<b style="color:${d >= REMIND_DAYS ? '#C53030' : 'inherit'}">${jpDate(m.date)}（${d === 0 ? '今日' : d + '日前'}）</b>　${m.count}件 → 今 ${c}件`; })()}</div>
       <div style="font-size:13px;color:#666">※ 復元しても今のデータは消えません。空いている日だけ、バックアップの内容を戻します。</div>
     </div>
     <div class="card"><h2>🌤 天気</h2>
@@ -774,35 +777,72 @@ function renderSetting() {
     confirmDialog('削除しますか？', pensionLabel(e), '削除', () => { updateSettings(s => Object.assign(s, { pensionHistory: s.pensionHistory.filter(x => x.from !== e.from) })); renderSetting(); });
   });
   v.querySelector('#exp').onclick = exportBackup;
-  const f = v.querySelector('#impFile');
-  v.querySelector('#imp').onclick = () => { f.value = ''; f.click(); };
-  f.addEventListener('change', () => {
-    const file = f.files && f.files[0]; if (!file) return;
-    confirmDialog('バックアップから復元しますか？', '今のデータは消えません。空いている日だけ、バックアップの内容を戻します。', '復元する', () => importBackup(file));
-  });
+  v.querySelector('#imp').onclick = pickRestoreFile;
   v.querySelector('#wxBtn').onclick = () => Weather.refresh(true);
   renderSettingWeatherBtn();
 }
 
+// ===== バックアップの見張り（空のデータで保存しない・忘れたら知らせる） =====
+const LS_BK = 'backup_meta';          // { date: 'YYYY-MM-DD', count: 件数 }
+const LS_BK_SNOOZE = 'backup_snooze'; // 「あとで」を押した日
+const LS_WELCOME = 'welcome_shown';
+const REMIND_DAYS = 7;
+/** 自分で入力した件数（日勤・夜勤で自動的に入る「出」「休」は数えない） */
+function inputCount(d) {
+  let n = 0;
+  for (const v of Object.values(d.sales)) if (String(v).trim() !== '') n++;
+  for (const [k, v] of Object.entries(d.dailyNight)) if (String(v).trim() !== '' && v !== Shift.dailyNightDefault(k)) n++;
+  return n;
+}
+function backupMeta() { try { return JSON.parse(lsGet(LS_BK) || 'null'); } catch (e) { return null; } }
+function daysSince(isoDate) { return toEpoch(todayIso()) - toEpoch(isoDate); }
+function markBackedUp(count) { lsSet(LS_BK, JSON.stringify({ date: todayIso(), count })); }
+
+/** 保存の前の確認。問題なければそのまま保存する */
 function exportBackup() {
+  const count = inputCount(data);
+  const meta = backupMeta();
+  if (count === 0) {
+    openDialog({
+      title: 'データがありません',
+      body: '<div>このブラウザには、まだ営収などの入力がありません。このまま保存すると<b>空のバックアップ</b>になります。</div>' +
+        '<div style="margin-top:8px">以前のデータがある場合は、先に「バックアップから復元」をしてください。</div>',
+      buttons: [{ label: 'やめる', cls: '' }, { label: '空のまま保存', cls: 'ghost danger', onClick: () => { doExport(count); } }]
+    });
+    return;
+  }
+  if (meta && meta.count >= 10 && count < meta.count / 2) {
+    openDialog({
+      title: '件数が大きく減っています',
+      body: `<div>前回のバックアップ（${jpDate(meta.date)}）：<b>${meta.count}件</b><br>今のデータ：<b>${count}件</b></div>` +
+        '<div style="margin-top:8px">データが消えている可能性があります。前回のバックアップファイルを残したまま、別のファイルとして保存しますか？</div>',
+      buttons: [{ label: 'やめる', cls: '' }, { label: '保存する', cls: 'ghost', onClick: () => { doExport(count); } }]
+    });
+    return;
+  }
+  doExport(count);
+}
+function doExport(count) {
   const json = Backup.export(data);
   const name = 'taxiSales_' + todayIso().replace(/-/g, '') + '.json';
   const file = new File([json], name, { type: 'application/json' });
   // iPhone は共有シートから「ファイルに保存」できる
   if (navigator.canShare && navigator.canShare({ files: [file] }) && /iPhone|iPad|iPod|Android/.test(navigator.userAgent)) {
     navigator.share({ files: [file], title: name })
-      .then(() => toast('バックアップを保存しました ✅'))
-      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(file); });
+      .then(() => { markBackedUp(count); toast('バックアップを保存しました ✅'); renderSetting(); })
+      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(file, count); });
     return;
   }
-  downloadFile(file);
+  downloadFile(file, count);
 }
-function downloadFile(file) {
+function downloadFile(file, count) {
   try {
     const url = URL.createObjectURL(file);
     const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
+    markBackedUp(count);
     toast('バックアップを保存しました ✅');
+    renderSetting();
   } catch (e) { toast('バックアップに失敗しました ❌'); }
 }
 function importBackup(file) {
@@ -820,6 +860,45 @@ function importBackup(file) {
   rd.readAsText(file, 'utf-8');
 }
 
+
+// 復元用のファイル選択（起動時の案内からも使う）
+const restoreInput = document.createElement('input');
+restoreInput.type = 'file'; restoreInput.accept = '.json,application/json,text/plain'; restoreInput.hidden = true;
+document.body.appendChild(restoreInput);
+restoreInput.addEventListener('change', () => {
+  const file = restoreInput.files && restoreInput.files[0]; if (!file) return;
+  confirmDialog('バックアップから復元しますか？', '今のデータは消えません。空いている日だけ、バックアップの内容を戻します。', '復元する', () => importBackup(file));
+});
+function pickRestoreFile() { restoreInput.value = ''; restoreInput.click(); }
+
+/** 起動時の案内：初めてなら復元の案内、データがあってバックアップが古ければ保存の案内 */
+function backupCheck() {
+  if (document.querySelector('.ov') || currentView() !== 'cal') return;
+  const count = inputCount(data);
+  if (count === 0) {
+    if (lsGet(LS_WELCOME)) return;
+    lsSet(LS_WELCOME, '1');
+    openDialog({
+      title: 'はじめに',
+      body: '<div>以前に使っていたスマホやブラウザのデータがある場合は、先に<b>バックアップから復元</b>してください。</div>' +
+        '<div style="margin-top:8px;font-size:13px;color:#666">あとからでも ⚙設定 →「バックアップから復元」でできます。</div>',
+      buttons: [{ label: '新しく始める' }, { label: '復元する', cls: '', onClick: () => { pickRestoreFile(); } }]
+    });
+    return;
+  }
+  const meta = backupMeta();
+  const days = meta ? daysSince(meta.date) : null;
+  if (meta && days < REMIND_DAYS) return;
+  if (lsGet(LS_BK_SNOOZE) === todayIso()) return;
+  const msg = meta
+    ? `前回のバックアップから<b>${days}日</b>たちました（${jpDate(meta.date)}・${meta.count}件）。`
+    : 'まだ一度もバックアップしていません。';
+  openDialog({
+    title: 'バックアップのお願い',
+    body: `<div>${msg}</div><div style="margin-top:8px">スマホの故障や機種変更でデータが消えないよう、保存しておきましょう。iPhoneは「"ファイル"に保存」→ iCloud Drive、Androidは Googleドライブ がおすすめです。</div>`,
+    buttons: [{ label: 'あとで', onClick: () => { lsSet(LS_BK_SNOOZE, todayIso()); } }, { label: '今すぐ保存', cls: '', onClick: () => { exportBackup(); } }]
+  });
+}
 
 // ===== 端末の文字サイズ設定の打ち消し（カレンダー部分だけ。Android版の FixedFontScale と同じ考え方） =====
 // 実際に表示された文字の幅と、文字サイズ設定の影響を受けない canvas で測った幅を比べて倍率を求める
@@ -854,6 +933,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   setTitle(curYm);
   requestAnimationFrame(() => { scrollToMonth(curYm); setTitle(curYm); });
   Weather.refresh(false);
+  setTimeout(backupCheck, 800);
   // 日付が変わったら「今日」の印を付け直す
   let lastDay = todayIso();
   document.addEventListener('visibilitychange', () => {
