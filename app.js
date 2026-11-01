@@ -746,9 +746,10 @@ function renderSetting() {
       <button class="btn wide" id="exp" style="background:#2196F3">📥 バックアップを保存</button>
       <button class="btn wide" id="imp" style="background:#FF9800">📤 バックアップから復元</button>
       <div style="font-size:14px">${(() => { const m = backupMeta(); const c = inputCount(data);
-        if (!m) return `最終バックアップ：<b style="color:#C53030">まだありません</b>（今のデータ ${c}件）`;
-        const d = daysSince(m.date);
-        return `最終バックアップ：<b style="color:${d >= REMIND_DAYS ? '#C53030' : 'inherit'}">${jpDate(m.date)}（${d === 0 ? '今日' : d + '日前'}）</b>　${m.count}件 → 今 ${c}件`; })()}</div>
+        const close = latestClose(), due = backupDue(m);
+        const st = due ? '<b style="color:#C53030">未保存</b>' : '<b style="color:#2F855A">保存済み ✅</b>';
+        const last = m ? `${jpDate(m.date)}（${daysSince(m.date) === 0 ? '今日' : daysSince(m.date) + '日前'}）${m.count}件 → 今 ${c}件` : `まだありません（今のデータ ${c}件）`;
+        return `${closeLabel(close)}の分：${st}<br><span style="font-size:13px;color:#555">最終バックアップ：${last}</span><br><span style="font-size:12px;color:#888">※ 毎月19日以降、その月の18日締めの分を保存するまでお知らせが出ます。</span>`; })()}</div>
       <div style="font-size:13px;color:#666">※ 復元しても今のデータは消えません。空いている日だけ、バックアップの内容を戻します。</div>
     </div>
     <div class="card"><h2>🌤 天気</h2>
@@ -786,7 +787,6 @@ function renderSetting() {
 const LS_BK = 'backup_meta';          // { date: 'YYYY-MM-DD', count: 件数 }
 const LS_BK_SNOOZE = 'backup_snooze'; // 「あとで」を押した日
 const LS_WELCOME = 'welcome_shown';
-const REMIND_DAYS = 7;
 /** 自分で入力した件数（日勤・夜勤で自動的に入る「出」「休」は数えない） */
 function inputCount(d) {
   let n = 0;
@@ -796,6 +796,11 @@ function inputCount(d) {
 }
 function backupMeta() { try { return JSON.parse(lsGet(LS_BK) || 'null'); } catch (e) { return null; } }
 function daysSince(isoDate) { return toEpoch(todayIso()) - toEpoch(isoDate); }
+/** いちばん最近の締め日（18日）。19日からはその月の18日、18日まではその前の月の18日 */
+function latestClose(today) { const t = today || todayIso(); return dDay(t) >= 19 ? atDay(ymOf(t), 18) : atDay(ymOf(t) - 1, 18); }
+/** 締め日の分をまだ保存していないか（最後のバックアップが締め日以前なら未保存） */
+function backupDue(meta) { return !meta || meta.date <= latestClose(); }
+function closeLabel(close) { return `${dMonth(close)}月18日締め`; }
 function markBackedUp(count) { lsSet(LS_BK, JSON.stringify({ date: todayIso(), count })); }
 
 /** 保存の前の確認。問題なければそのまま保存する */
@@ -887,12 +892,11 @@ function backupCheck() {
     return;
   }
   const meta = backupMeta();
-  const days = meta ? daysSince(meta.date) : null;
-  if (meta && days < REMIND_DAYS) return;
+  if (!backupDue(meta)) return;
   if (lsGet(LS_BK_SNOOZE) === todayIso()) return;
-  const msg = meta
-    ? `前回のバックアップから<b>${days}日</b>たちました（${jpDate(meta.date)}・${meta.count}件）。`
-    : 'まだ一度もバックアップしていません。';
+  const close = latestClose();
+  const msg = `<b>${closeLabel(close)}</b>の分（${dMonth(atDay(ymOf(close) - 1, 19))}/19〜${dMonth(close)}/18）のバックアップがまだです。` +
+    (meta ? `<div style="font-size:13px;color:#666;margin-top:4px">前回のバックアップ：${jpDate(meta.date)}（${meta.count}件）</div>` : '<div style="font-size:13px;color:#666;margin-top:4px">まだ一度もバックアップしていません。</div>');
   openDialog({
     title: 'バックアップのお願い',
     body: `<div>${msg}</div><div style="margin-top:8px">スマホの故障や機種変更でデータが消えないよう、保存しておきましょう。iPhoneは「"ファイル"に保存」→ iCloud Drive、Androidは Googleドライブ がおすすめです。</div>`,
