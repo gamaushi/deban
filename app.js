@@ -834,8 +834,11 @@ function doExport(count) {
   const mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
   const can = f => { try { return !!(navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } };
   // iPhone は .json のまま共有できる。Android の Chrome/Brave は .json を共有できないので .txt にする（中身は同じ）
+  // Android の Chrome は「共有できるか」の確認では .json も通すが、実際に送ると NotAllowedError で断る。
+  // そのため Android では最初から .txt で渡す
+  const android = /Android/.test(navigator.userAgent) || (mobile && !/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent));
   let file = new File([json], base + '.json', { type: 'application/json' });
-  if (mobile && !can(file)) file = new File([json], base + '.txt', { type: 'text/plain' });
+  if (mobile && (android || !can(file))) file = new File([json], base + '.txt', { type: 'text/plain' });
   if (mobile && can(file)) {
     navigator.share({ files: [file], title: file.name })
       .then(() => { markBackedUp(count); toast('バックアップを保存しました ✅'); renderSetting(); })
