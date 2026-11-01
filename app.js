@@ -838,12 +838,13 @@ function doExport(count) {
   if (mobile && can(file)) {
     navigator.share({ files: [file], title: file.name })
       .then(() => { markBackedUp(count); toast('バックアップを保存しました ✅'); renderSetting(); })
-      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(new File([json], base + '.json', { type: 'application/json' }), count); });
+      .catch(e => { if (e && e.name !== 'AbortError') downloadFile(new File([json], base + '.json', { type: 'application/json' }), count, '共有に失敗：' + e.name); });
     return;
   }
-  downloadFile(new File([json], base + '.json', { type: 'application/json' }), count);
+  const why = !navigator.share ? 'このブラウザには共有機能がありません' : !navigator.canShare ? 'このブラウザはファイルの共有に対応していません' : 'このブラウザでは .json も .txt も共有できません';
+  downloadFile(new File([json], base + '.json', { type: 'application/json' }), count, why);
 }
-function downloadFile(file, count) {
+function downloadFile(file, count, why) {
   try {
     const url = URL.createObjectURL(file);
     const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
@@ -856,7 +857,8 @@ function downloadFile(file, count) {
         title: 'スマホ本体に保存しました',
         body: `<div>「ダウンロード」フォルダに <b>${esc(file.name)}</b> を保存しました。</div>` +
           '<div style="margin-top:8px">スマホの故障や紛失に備えて、Googleドライブにも移しておいてください。</div>' +
-          '<ol style="margin:8px 0 0;padding-left:1.3em;font-size:14px"><li>Googleドライブのアプリを開く</li><li>「＋」→「アップロード」</li><li>「ダウンロード」の中のこのファイルを選ぶ</li></ol>',
+          '<ol style="margin:8px 0 0;padding-left:1.3em;font-size:14px"><li>Googleドライブのアプリを開く</li><li>「＋」→「アップロード」</li><li>「ダウンロード」の中のこのファイルを選ぶ</li></ol>' +
+          (why ? `<div style="margin-top:8px;font-size:12px;color:#888">理由：${esc(why)}</div>` : ''),
         buttons: [{ label: 'OK', cls: '' }]
       });
     } else toast('バックアップを保存しました ✅');
