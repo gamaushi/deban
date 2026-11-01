@@ -830,7 +830,8 @@ function exportBackup() {
 function doExport(count) {
   const json = Backup.export(data);
   const base = 'taxiSales_' + todayIso().replace(/-/g, '');
-  const mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
+  // 「PC版サイト」表示にしていると端末名が隠れるので、指で操作する画面かどうかでも判定する
+  const mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
   const can = f => { try { return !!(navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } };
   // iPhone は .json のまま共有できる。Android の Chrome/Brave は .json を共有できないので .txt にする（中身は同じ）
   let file = new File([json], base + '.json', { type: 'application/json' });
@@ -841,7 +842,7 @@ function doExport(count) {
       .catch(e => { if (e && e.name !== 'AbortError') downloadFile(new File([json], base + '.json', { type: 'application/json' }), count, '共有に失敗：' + e.name); });
     return;
   }
-  const why = !navigator.share ? 'このブラウザには共有機能がありません' : !navigator.canShare ? 'このブラウザはファイルの共有に対応していません' : 'このブラウザでは .json も .txt も共有できません';
+  const why = !mobile ? 'スマホと判定されませんでした（PC版サイト表示？）' : !navigator.share ? 'このブラウザには共有機能がありません' : !navigator.canShare ? 'このブラウザはファイルの共有に対応していません' : 'このブラウザでは .json も .txt も共有できません';
   downloadFile(new File([json], base + '.json', { type: 'application/json' }), count, why);
 }
 function downloadFile(file, count, why) {
@@ -851,7 +852,7 @@ function downloadFile(file, count, why) {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     markBackedUp(count);
     renderSetting();
-    if (/Android|iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    if (/Android|iPhone|iPad|iPod/.test(navigator.userAgent) || navigator.maxTouchPoints > 0) {
       // 共有画面が使えずスマホ本体に保存された：スマホをなくすと一緒に消えるので、移す方法を案内する
       openDialog({
         title: 'スマホ本体に保存しました',
