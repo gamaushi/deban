@@ -180,18 +180,16 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 <!-- 設定 -->
 <div class="overlay" id="setView">
   <div class="panel">
-    <h2>設定（手書きの読み取り：Azure AI Vision）</h2>
-    <label for="ep">エンドポイント</label>
-    <input type="text" id="ep" placeholder="https://(リソース名).cognitiveservices.azure.com/" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <label for="key">キー（キー1）</label>
-    <input type="password" id="key" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <div class="chk"><input type="checkbox" id="showKey"><label for="showKey" style="margin:0;color:inherit;font-size:14px">キーを表示する</label></div>
+    <h2 id="setTitle">設定</h2>
+    <label for="pass">合言葉（山と言ったら？）</label>
+    <input type="password" id="pass" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+    <div class="chk"><input type="checkbox" id="showKey"><label for="showKey" style="margin:0;color:inherit;font-size:14px">合言葉を表示する</label></div>
     <div class="chk"><input type="checkbox" id="useLocal"><label for="useLocal" style="margin:0;color:inherit;font-size:14px">Azureが使えない時は端末で読み取る</label></div>
     <div class="note">
-      ・キーはこのスマホの中（ブラウザ）にだけ保存され、外には送りません（Azureへの読み取り依頼を除く）。<br>
-      ・無料プラン(F0)は月5,000回・1分20回まで。上限を超えても課金はされません。<br>
-      ・「端末で読み取る」は印刷文字のみ・精度は低めです。初回だけ読み取り用データ（数MB）をダウンロードします。<br>
-      ・キーが未設定でも、電卓での手入力は使えます。
+      ・合言葉はこのスマホの中（ブラウザ）に保存されるので、入れるのは最初の1回だけです。<br>
+      ・読み取りはAzure（手書きも読める）で行います。無料枠は全員合わせて月5,000回までで、超えても課金はされません。<br>
+      ・「端末で読み取る」は印刷文字のみ・精度は低めです。<br>
+      ・合言葉がなくても、電卓での手入力は使えます。
     </div>
     <div class="btns"><button id="setCancel">閉じる</button><button class="pri" id="setSave">保存</button></div>
   </div>
@@ -209,7 +207,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 
 <script>
 'use strict';
-const VERSION = 'v5.0 (Web版)';
+const VERSION = 'v5.1 (Web版)';
 
 /* ============================================================
    項目の定義（日報に表示される順番）
@@ -244,7 +242,12 @@ function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){
 // state.values[id] = 文字列（"" / "1234" / "???"）、memos[id] = 計算式、low = 黄色の項目
 let state = load(STORE_KEY, null) || {values:{}, memos:{}, low:[], engine:''};
 state.values ||= {}; state.memos ||= {}; state.low ||= [];
-let conf = load(CONF_KEY, {ep:'', key:'', useLocal:true});
+// 読み取りの中継（Cloudflare Workers。Azureのキーはそちらにだけ置く）
+const RELAY_URL = 'https://nokin-ocr.admin11pm.workers.dev/';
+const FREE_LIMIT = 5000;   // Azure無料枠(月)
+let conf = load(CONF_KEY, {});
+conf = {pass: conf.pass || '', useLocal: conf.useLocal !== false};
+let monthCount = null;     // 今月のAzure利用回数(全員の合計)
 
 /* ============================================================
    画面づくり
@@ -278,7 +281,10 @@ function render(){
     memoEls[f.id].classList.toggle('show', !!m);
   }
   recalc();
-  $('ver').textContent = VERSION.replace(' ', '\n') + (state.engine ? '\n' + state.engine : '');
+  const v = $('ver');
+  v.textContent = VERSION.replace(' ', '\n') + (state.engine ? '\n' + state.engine : '') +
+    (monthCount !== null ? `\n今月 ${fmt(monthCount)}回` : '');
+  v.style.color = (monthCount !== null && monthCount >= 4500) ? 'var(--warn)' : '';
   save(STORE_KEY, state);
 }
 
@@ -448,7 +454,7 @@ const LABEL_SPECS = {
   ticket:     {keywords:['チケット']},
   credit:     {keywords:['クレジットカード','キャブカード','クレジット','キャブ'], tol:2.2},
   id:         {keywords:['iD']},
-  ic:         {keywords:['交通系ICカード','交通系IC']},
+  ic:         {keywords:['交通系ICカード','交通系IC','交通系','ICカード']},   // 小さい「IC」は lC/1C/|C と誤読されやすい
   waon:       {keywords:['WAON']},
   nanaco:     {keywords:['nanaco','ナナコ']},
   quicpay:    {keywords:['QUICPay','QUICPAY','クイックペイ']},
@@ -575,7 +581,8 @@ function parseLines(ocrLines, handwritingCapable){
 /* ============================================================
    撮影 → 読み取り
    ============================================================ */
-const MAX_SIDE = 2400;   // 送る写真の長い辺の最大ピクセル
+const MAX_SIDE = 3000;   // 送る写真の長い辺の最大ピクセル
+const JPEG_Q = 0.92;     // 送る写真の画質
 let lastPhotoUrl = null;
 
 $('shoot').addEventListener('click', () => { $('file').value = ''; $('file').click(); });
@@ -586,7 +593,7 @@ $('file').addEventListener('change', async e => {
   setBusy(true, '写真を準備中…');
   try{
     const canvas = await fileToCanvas(file);
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', JPEG_Q));
     if (lastPhotoUrl) URL.revokeObjectURL(lastPhotoUrl);
     lastPhotoUrl = URL.createObjectURL(blob);
     $('thumb').src = lastPhotoUrl; $('thumb').style.display = 'block';
@@ -607,9 +614,20 @@ function fileToCanvas(file){
       // iPhoneの写真の向き(EXIF)はSafariが自動で反映する
       const w = img.naturalWidth, h = img.naturalHeight;
       const sc = Math.min(1, MAX_SIDE / Math.max(w, h));
+      const tw = Math.round(w * sc), th = Math.round(h * sc);
+      // 一気に縮めると細い線がつぶれるので、半分ずつ段階的に縮める
+      let src = img, sw = w, sh = h;
+      while (sw / 2 >= tw && sh / 2 >= th){
+        const t = document.createElement('canvas');
+        t.width = Math.round(sw / 2); t.height = Math.round(sh / 2);
+        const tc = t.getContext('2d'); tc.imageSmoothingQuality = 'high';
+        tc.drawImage(src, 0, 0, t.width, t.height);
+        src = t; sw = t.width; sh = t.height;
+      }
       const c = document.createElement('canvas');
-      c.width = Math.round(w * sc); c.height = Math.round(h * sc);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.width = tw; c.height = th;
+      const cx = c.getContext('2d'); cx.imageSmoothingQuality = 'high';
+      cx.drawImage(src, 0, 0, tw, th);
       URL.revokeObjectURL(url);
       resolve(c);
     };
@@ -618,57 +636,74 @@ function fileToCanvas(file){
   });
 }
 
-const azureReady = () => !!(conf.ep && conf.key);
-
 async function runOcr(blob, canvas){
-  if (azureReady()){
-    setBusy(true, '読み取り中…');
-    const r = await azureRecognize(blob);
-    if (r.ok){ applyResult(parseLines(r.lines, true), 'Azure', true); return; }
-    if (!conf.useLocal){ toast(r.reason + '。金額は電卓で入力してください', 4500); return; }
-    toast(r.reason + '。端末の読み取りを使います', 3500);
-    await localRecognize(canvas, '端末');
+  if (!conf.pass){
+    openSettings('最初に合言葉を入れてください');
+    if (conf.useLocal) await localRecognize(canvas, '端末(合言葉なし)');
     return;
   }
-  if (!conf.useLocal){
-    toast('読み取りの設定がありません。⚙設定でAzureのキーを入れてください', 4500);
+  setBusy(true, '読み取り中…');
+  const r = await relayOcr(blob);
+  if (r.ok){ applyResult(parseLines(parseAzure({readResult:{blocks:r.blocks}}), true), 'Azure', true); return; }
+  if (r.error === 'pass'){
+    conf.pass = ''; save(CONF_KEY, conf);
+    setBusy(false);
+    openSettings('合言葉が違います。入れ直してください');
     return;
   }
-  await localRecognize(canvas, '端末(キー未設定)');
+  if (!conf.useLocal){ toast(r.message + '。金額は電卓で入力してください', 4500); return; }
+  toast(r.message + '。端末の読み取りを使います', 3500);
+  await localRecognize(canvas, '端末');
 }
 
-/** Azure AI Vision (Image Analysis 4.0 Read) */
-async function azureRecognize(blob){
-  const url = conf.ep.trim().replace(/\/+$/, '') +
-    '/computervision/imageanalysis:analyze?api-version=2024-02-01&features=read';
+/** 中継(Cloudflare)へ送る。action: 'check' | 'count' | なし(写真を読む) */
+async function relayCall(body, action, pass){
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 25000);
+  const timer = setTimeout(() => ctl.abort(), action ? 10000 : 30000);
   try{
-    const res = await fetch(url, {
-      method:'POST',
-      headers:{'Ocp-Apim-Subscription-Key':conf.key.trim(), 'Content-Type':'application/octet-stream'},
-      body: blob, signal: ctl.signal
-    });
-    if (res.status === 403 || res.status === 429) return {ok:false, reason:'手書き読み取りの無料枠の上限に達しました'};
-    if (res.status === 401) return {ok:false, reason:'Azureのキーが正しくありません'};
-    if (res.status === 404) return {ok:false, reason:'Azureのエンドポイントが正しくありません'};
-    if (!res.ok) return {ok:false, reason:`Azureの読み取りに失敗しました(コード${res.status})`};
-    const body = await res.json();
-    return {ok:true, lines: parseAzure(body)};
+    const headers = {'X-Pass': encodeURIComponent(pass ?? conf.pass)};
+    if (action) headers['X-Action'] = action;
+    else headers['Content-Type'] = 'image/jpeg';
+    const res = await fetch(RELAY_URL, {method:'POST', headers, body: body || undefined, signal: ctl.signal});
+    let data = null;
+    try{ data = await res.json(); }catch(e){}
+    if (!data) return {ok:0, error:'fail', message:`読み取りに失敗しました(コード${res.status})`};
+    if (typeof data.count === 'number' && data.count_ok){ monthCount = data.count; render(); }
+    return data;
   }catch(e){
-    return {ok:false, reason:'Azureと通信できませんでした'};
+    return {ok:0, error:'net', message:'通信できませんでした'};
   }finally{
     clearTimeout(timer);
   }
+}
+const relayOcr = blob => relayCall(blob, null);
+
+/** 写真の傾き(ラジアン)。各行の上辺の向きの中央値。斜めに撮っても行の高さを揃えるために使う */
+function tiltAngle(blocks){
+  const angs = [];
+  for (const b of blocks) for (const line of (b.lines || [])){
+    const p = line.boundingPolygon || [];
+    if (p.length < 2) continue;
+    const dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
+    if (Math.hypot(dx, dy) < 30) continue;   // 短すぎる行は向きが当てにならない
+    const a = Math.atan2(dy, dx);
+    if (Math.abs(a) < Math.PI / 4) angs.push(a);
+  }
+  if (!angs.length) return 0;
+  angs.sort((x, y) => x - y);
+  return angs[Math.floor(angs.length / 2)];
 }
 
 function parseAzure(body){
   const out = [];
   const blocks = (body.readResult && body.readResult.blocks) || [];
+  const ang = tiltAngle(blocks), cos = Math.cos(-ang), sin = Math.sin(-ang);
   for (const b of blocks){
     for (const line of (b.lines || [])){
-      const poly = line.boundingPolygon || [];
-      if (!poly.length) continue;
+      const poly0 = line.boundingPolygon || [];
+      if (!poly0.length) continue;
+      // 傾きを打ち消すように座標を回す
+      const poly = poly0.map(p => ({x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos}));
       const xs = poly.map(p => p.x), ys = poly.map(p => p.y);
       // 数字を含む単語の確信度のうち、いちばん低いもの
       let conf = null;
@@ -760,20 +795,40 @@ $('photoClose').addEventListener('click', () => show('photoView', false));
 /* ============================================================
    設定・クリア
    ============================================================ */
-$('setBtn').addEventListener('click', () => {
-  $('ep').value = conf.ep; $('key').value = conf.key; $('useLocal').checked = conf.useLocal !== false;
-  $('showKey').checked = false; $('key').type = 'password';
+function openSettings(title){
+  $('setTitle').textContent = title || '設定';
+  $('pass').value = conf.pass; $('useLocal').checked = conf.useLocal !== false;
+  $('showKey').checked = false; $('pass').type = 'password';
   show('setView', true);
-});
-$('showKey').addEventListener('change', e => { $('key').type = e.target.checked ? 'text' : 'password'; });
+}
+$('setBtn').addEventListener('click', () => openSettings());
+$('showKey').addEventListener('change', e => { $('pass').type = e.target.checked ? 'text' : 'password'; });
 $('setCancel').addEventListener('click', () => show('setView', false));
-$('setSave').addEventListener('click', () => {
-  const ep = $('ep').value.trim();
-  if (ep && !/^https:\/\//i.test(ep)){ toast('エンドポイントは https:// で始まるURLを入れてください'); return; }
-  conf = {ep, key:$('key').value.trim(), useLocal:$('useLocal').checked};
+$('setSave').addEventListener('click', async () => {
+  const pass = $('pass').value.trim();
+  conf.useLocal = $('useLocal').checked;
+  if (pass && pass !== conf.pass){
+    const btn = $('setSave'); btn.disabled = true; btn.textContent = '確認中…';
+    const r = await relayCall(null, 'check', pass);
+    btn.disabled = false; btn.textContent = '保存';
+    if (!r.ok){
+      toast(r.error === 'pass' ? '合言葉が違います' : r.message + '。あとでもう一度試してください', 3000);
+      return;
+    }
+    conf.pass = pass;
+    relayCall(null, 'count');
+  } else if (!pass){
+    conf.pass = '';
+  }
   save(CONF_KEY, conf);
   show('setView', false);
-  toast(azureReady() ? 'Azureの設定を保存しました' : '保存しました（Azureは未設定）', 2200);
+  toast(conf.pass ? '保存しました' : '保存しました（合言葉なし）', 2000);
+});
+
+// 今月の回数をタップすると残りを表示
+$('ver').addEventListener('click', () => {
+  if (monthCount === null) return;
+  toast(`Azureの今月の利用：${fmt(monthCount)}回\n無料枠の残り：約${fmt(Math.max(0, FREE_LIMIT - monthCount))}回`, 3500);
 });
 
 $('clearBtn').addEventListener('click', () => show('askView', true));
@@ -783,21 +838,11 @@ $('askYes').addEventListener('click', () => {
   render(); show('askView', false); listEl.scrollTop = 0;
 });
 
-/* ---- URLで設定を受け取る（#ep=...&key=... で開くと保存してURLから消す） ---- */
-(function(){
-  if (!location.hash || location.hash.length < 2) return;
-  const p = new URLSearchParams(location.hash.slice(1));
-  if (!p.has('key') && !p.has('ep')) return;
-  conf = {ep: p.get('ep') || conf.ep, key: p.get('key') || conf.key, useLocal: conf.useLocal !== false};
-  save(CONF_KEY, conf);
-  history.replaceState(null, '', location.pathname + location.search);
-  setTimeout(() => toast('Azureの設定を保存しました'), 300);
-})();
-
 // iPhoneでダブルタップ拡大を防ぐ
 document.addEventListener('dblclick', e => e.preventDefault(), {passive:false});
 
 render();
+if (conf.pass) relayCall(null, 'count');   // 起動時に今月の回数を取る
 </script>
 </body>
 </html>
