@@ -114,6 +114,8 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 .panel h2{font-size:17px;margin:0 0 10px}
 .panel label{display:block;font-size:13px;color:var(--ink-soft);margin:10px 0 3px}
 .panel input[type=text],.panel input[type=password]{width:100%;font-size:16px;padding:8px;border:1px solid var(--rule);border-radius:6px;background:#fff}
+/* 合言葉は日本語も打てるよう普通の入力欄にし、文字だけ●で隠す（パスワード欄だと日本語入力が使えないため） */
+.panel input.mask{-webkit-text-security:disc;text-security:disc}
 .panel .chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin-top:12px}
 .panel .note{font-size:12px;color:var(--ink-soft);line-height:1.6;margin-top:10px}
 .panel .btns{display:flex;gap:10px;margin-top:16px}
@@ -182,7 +184,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
   <div class="panel">
     <h2 id="setTitle">設定</h2>
     <label for="pass">合言葉（山と言ったら？）</label>
-    <input type="password" id="pass" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+    <input type="text" id="pass" class="mask" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
     <div class="chk"><input type="checkbox" id="showKey"><label for="showKey" style="margin:0;color:inherit;font-size:14px">合言葉を表示する</label></div>
     <div class="chk"><input type="checkbox" id="useLocal"><label for="useLocal" style="margin:0;color:inherit;font-size:14px">Azureが使えない時は端末で読み取る</label></div>
     <div class="note">
@@ -207,7 +209,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 
 <script>
 'use strict';
-const VERSION = 'v5.1 (Web版)';
+const VERSION = 'v5.2 (Web版)';
 
 /* ============================================================
    項目の定義（日報に表示される順番）
@@ -798,11 +800,11 @@ $('photoClose').addEventListener('click', () => show('photoView', false));
 function openSettings(title){
   $('setTitle').textContent = title || '設定';
   $('pass').value = conf.pass; $('useLocal').checked = conf.useLocal !== false;
-  $('showKey').checked = false; $('pass').type = 'password';
+  $('showKey').checked = false; $('pass').classList.add('mask');
   show('setView', true);
 }
 $('setBtn').addEventListener('click', () => openSettings());
-$('showKey').addEventListener('change', e => { $('pass').type = e.target.checked ? 'text' : 'password'; });
+$('showKey').addEventListener('change', e => { $('pass').classList.toggle('mask', !e.target.checked); });
 $('setCancel').addEventListener('click', () => show('setView', false));
 $('setSave').addEventListener('click', async () => {
   const pass = $('pass').value.trim();
