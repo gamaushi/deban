@@ -67,6 +67,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 .month { padding-bottom: 10px; }
 .mtitle { text-align: center; font-size: calc(16px * var(--k)); font-weight: 700; color: #333; padding: 3px 0; }
 .mtitle.now { background: #7DD3FC; color: #0C3A5B; font-size: calc(18px * var(--k)); border-radius: 6px 6px 0 0; padding: 4px 0; }
+.nowbox { border: 3px solid #7DD3FC; border-radius: 8px; overflow: hidden; }
+.nowbox .mtitle.now { border-radius: 0; }
 .mtitle .nowtag { display: inline-block; background: #fff; color: #0C3A5B; font-size: calc(12px * var(--k)); border-radius: 10px; padding: 0 8px; margin-left: 6px; vertical-align: 2px; line-height: 1.6; }
 .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #fff; }
 .cell { min-height: 80px; border: .5px solid var(--grid); padding: 2px; display: flex; flex-direction: column;

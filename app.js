@@ -300,7 +300,10 @@ function monthInner(ym) {
     const day = i - offset + 1;
     g += (day >= 1 && day <= len) ? cellHtml(atDay(ym, day), led, red, marks, today, simple) : '<div class="cell"></div>';
   }
-  return (ym === ymNow() ? `<div class="mtitle now">${ymJp(ym)}<span class="nowtag">今月</span></div>` : `<div class="mtitle">${ymJp(ym)}</div>`) + `<div class="grid${simple ? ' simple' : ''}">${g}</div>` +
+  const grid = `<div class="grid${simple ? ' simple' : ''}">${g}</div>`;
+  return (ym === ymNow()
+    ? `<div class="nowbox"><div class="mtitle now">${ymJp(ym)}<span class="nowtag">今月</span></div>${grid}</div>`
+    : `<div class="mtitle">${ymJp(ym)}</div>${grid}`) +
     (simple ? '' : summaryHtml(led.summary(ym), p));
 }
 
