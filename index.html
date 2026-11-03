@@ -35,6 +35,11 @@ input, select { font: inherit; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe-t); background: var(--blue); z-index: 30; }
 
 /* ===== 上部 ===== */
+/* パソコンなど広い画面では、横に間延びしないよう幅に上限をつけて真ん中に置く */
+@media (min-width: 900px) {
+  html { background: #CBD5E1; }
+  body { max-width: 860px; margin: 0 auto; box-shadow: 0 0 24px rgba(0,0,0,.18); min-height: 100vh; }
+}
 #top { position: sticky; top: var(--safe-t); z-index: 20; background: var(--bg); }
 .bar { display: flex; align-items: center; gap: 4px; background: var(--blue); color: #fff;
   padding: 3px max(6px, var(--safe-r)) 3px max(6px, var(--safe-l)); min-height: 46px; flex-wrap: nowrap; }
