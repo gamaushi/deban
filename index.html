@@ -96,8 +96,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 /* 集計 */
 .sum { margin-top: 4px; background: #fff; border: .5px solid var(--grid); }
 .srow { display: flex; align-items: stretch; border: .5px solid var(--grid); }
-.slabel { width: 58px; flex: none; background: var(--label-bg); font-size: calc(12px * var(--k)); font-weight: 700; color: #333;
-  display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 3px; }
+/* 見出しは折り返さない（ブラウザの「最小フォントサイズ」設定などで文字が大きくなっても、幅を広げて1行に収める） */
+.slabel { min-width: 58px; flex: none; background: var(--label-bg); font-size: calc(12px * var(--k)); font-weight: 700; color: #333;
+  display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 5px; white-space: nowrap; }
 .sitems { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; padding: 4px 6px; font-size: calc(13px * var(--k)); align-items: center; }
 .sitems span { white-space: nowrap; }
 .b { font-weight: 700; }

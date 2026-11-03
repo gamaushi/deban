@@ -1,6 +1,6 @@
 // オフラインでも開けるようにする（画面のファイルだけ保存。天気はネットから）
 // 更新したら VERSION を変えると、次に開いたときに新しいファイルへ入れ替わります
-const VERSION = 'deban-v7';
+const VERSION = 'deban-v8';
 const FILES = ['./', 'index.html', 'logic.js', 'app.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
