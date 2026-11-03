@@ -208,8 +208,19 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 <div id="toast"></div>
 
 <script>
+// LINEの中のブラウザでは撮影ボタンがカメラにならないので、いつものブラウザで開き直す
+// （LINEは URL に openExternalBrowser=1 が付いていると外のブラウザで開く）
+(function(){
+  if (/\bLine\//i.test(navigator.userAgent) && !/[?&]openExternalBrowser=1/.test(location.search)){
+    const u = new URL(location.href);
+    u.searchParams.set('openExternalBrowser', '1');
+    location.replace(u.toString());
+  }
+})();
+</script>
+<script>
 'use strict';
-const VERSION = 'v5.3 (Web版)';
+const VERSION = 'v5.4 (Web版)';
 
 /* ============================================================
    項目の定義（日報に表示される順番）
