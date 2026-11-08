@@ -663,6 +663,11 @@ function renderSalaryDynamic() {
     jyoumusu: num(st.jyoumusu), yuukyu: num(st.yuukyu), noAbsence: st.noAbsence, noAccident: s.noAccident, meeting: s.meeting,
     hyoujyun: pension ? pension.hyoujyun : 0, sekinin: st.sekinin });
   const w = r.main;
+  // 責任出番に届かない月は「事故なし」のチェックを外して触れないようにする（保存している設定は変えない。届けば元に戻る）
+  const cleared = Salary.sekininCleared({ kind, sekinin: st.sekinin, jyoumusu: num(st.jyoumusu), yuukyu: num(st.yuukyu) });
+  const na = v.querySelector('#noAccident');
+  na.checked = s.noAccident && cleared; na.disabled = !cleared;
+  na.closest('.frow').style.opacity = cleared ? '' : '.5';
   const badge = (t, bg, fg) => `<span class="badge" style="background:${bg};color:${fg}">${t}</span>`;
   const irow = (l, val) => `<div class="irow"><span>${l}</span><b>${val}</b></div>`;
   const d = r.diff, col = d > 0 ? '#2F855A' : d < 0 ? '#C53030' : 'gray', sg = d >= 0 ? '+' : '-';
@@ -672,7 +677,7 @@ function renderSalaryDynamic() {
     badge(r.isNewWage ? '新賃金適用' : '旧賃金適用', r.isNewWage ? '#E7F7ED' : '#E8F3FC', r.isNewWage ? '#1F8A4C' : 'var(--blue)') + '</div>' +
     (r.note ? `<div style="color:#C53030;font-weight:700">${r.note}</div>` : '') +
     irow('本給・深夜手当・時間外手当', yen(w.honkyu) + '円') + irow('精勤手当', yen(w.seikin) + '円') + irow('無事故手当', yen(w.mujiko) + '円') +
-    (s.noAccident && !Salary.sekininCleared({ kind, sekinin: st.sekinin, jyoumusu: num(st.jyoumusu), yuukyu: num(st.yuukyu) }) ? `<div class="note">※責任出番（${Salary.sekininCount({ kind, sekinin: st.sekinin })}回）に届いていないため、無事故手当は付きません（乗務数＋有給で判定）</div>` : '') +
+    (!cleared ? `<div class="note">※責任出番（${Salary.sekininCount({ kind, sekinin: st.sekinin })}回）に届いていないため、無事故手当は付きません（乗務数＋有給で判定）</div>` : '') +
     irow('通勤手当', yen(w.tsukin) + '円') + irow('教育手当', yen(w.kyouiku) + '円') + irow('公出手当（65%）', yen(w.koushutsuTeate) + '円') +
     irow('有給手当', yen(w.yuukyuTeate) + '円') + irow('歩率（手当除く）', w.rate.toFixed(2) + '%') +
     `<div class="total"><span>総支給額</span><span class="n">${yen(w.total)}円</span></div>` +
