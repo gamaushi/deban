@@ -211,11 +211,21 @@ class Ledger {
   }
   initialExtra(ym) { return Math.max(0, Shift.shiftDaysInPeriod(ym, this.pattern).length - Shift.baseLimit(ymM(ym), false)); }
 
-  /** 公出消化扱いの有給（2026/4/19以降・隔日） */
+  /** 日勤・夜勤の公出の数：（出番＋有給＋欠勤の日）が責任出番を超えた分。有給・欠勤の日も、もともと出番だった日として数える */
+  dailyNightInitialExtra(ym) {
+    const vs = this.valuesIn(ym);
+    const days = vs.filter(x => Values.isRevenue(x[1]) || Values.isWork(x[1]) || Values.isPaid(x[1]) || Values.isAbsent(x[1])).length;
+    return Math.max(0, days - Shift.baseLimit(ymM(ym), true));
+  }
+  /** 公出消化扱いの有給（隔日は2026/4/19以降、日勤・夜勤は全期間）。欠勤が先に公出を消し、残った公出の数だけ日付の早い有給から公出消になる */
   consumedPaidIn(ym) {
     if (this._consumed.has(ym)) return this._consumed.get(ym);
     let r = new Set();
-    if (!this.dailyNight && Shift.isNewRulePeriod(ym)) {
+    if (this.dailyNight) {
+      const vs = this.valuesIn(ym);
+      const slot = Math.max(0, this.dailyNightInitialExtra(ym) - vs.filter(x => Values.isAbsent(x[1])).length);
+      r = new Set(vs.filter(x => Values.isPaid(x[1])).slice(0, slot).map(x => x[0]));
+    } else if (Shift.isNewRulePeriod(ym)) {
       const vs = this.valuesIn(ym);
       const slot = Math.max(0, this.initialExtra(ym) - vs.filter(x => Values.isAbsent(x[1])).length);
       r = new Set(vs.filter(x => Values.isPaid(x[1])).slice(0, slot).map(x => x[0]));
@@ -298,7 +308,10 @@ class Ledger {
     const vs = this.valuesIn(ym);
     const records = vs.filter(x => Values.isRevenue(x[1]));
     const scheduledList = vs.filter(x => Values.isWork(x[1]));
-    const paid = vs.filter(x => Values.isPaid(x[1])).length;
+    const consumed = this.consumedPaidIn(ym);
+    const paidAll = vs.filter(x => Values.isPaid(x[1]));
+    const consumedPaid = paidAll.filter(x => consumed.has(x[0])).length;
+    const paid = paidAll.length - consumedPaid;   // 公出消の分は有給に数えない
     const absent = vs.filter(x => Values.isAbsent(x[1])).length;
     const all = records.map(x => [x[0], Values.revenue(x[1])]).concat(scheduledList.map(x => [x[0], 0]))
       .sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
@@ -316,7 +329,7 @@ class Ledger {
       ym, dailyNight: true, periodStart: Shift.periodStart(ym), periodEnd: Shift.periodEnd(ym), base,
       weekdays: wd, weekdayHolidays: hol, saturdays: sat, sundays: sun,
       baseRevenue: baseRev, extraRevenue: extraRev, totalRevenue: baseRev + extraRev,
-      extraCount: extraDays, absent, paid, remainingToClear: base - current,
+      extraCount: extraDays, absent, paid, consumedPaid, remainingToClear: base - current,
       scheduledWork: scheduledList.length, actualWork: records.length,
       scheduledBase: Math.max(0, scheduledList.length - scheduledExtra), scheduledExtra, actualExtra,
       shortage: Math.max(0, base - planned),
@@ -327,10 +340,20 @@ class Ledger {
   }
   /** 有給を入れるときの判定 → {type:'normal'|'consumed'|'blocked', reason} */
   checkPaid(d) {
-    if (this.dailyNight || d < Shift.NEW_RULE_DATE) return { type: 'normal' };
     const ym = Shift.periodMonthOf(d);
+    if (this.dailyNight) {
+      // その日に有給を入れたと仮定して、公出消になるかを見る
+      const trial = Object.assign({}, this.store); trial[d] = '有給';
+      if (new Ledger(trial, this.pattern, this.hireDate).isConsumed(d)) return { type: 'consumed' };
+      return this.checkRemaining(d, ym);
+    }
+    if (d < Shift.NEW_RULE_DATE) return { type: 'normal' };
     const used = this.valuesIn(ym).filter(x => x[0] !== d && (Values.isPaid(x[1]) || Values.isAbsent(x[1]))).length;
     if (this.initialExtra(ym) - used > 0) return { type: 'consumed' };
+    return this.checkRemaining(d, ym);
+  }
+  /** 普通の有給として入れられるか（有給残が1出番以上あるか） */
+  checkRemaining(d, ym) {
     if (!this.hireDate) return { type: 'blocked', reason: '入社年月日が未入力のため有給残を確認できません。設定画面で入社年月日を入力してください。' };
     const without = Object.assign({}, this.store); delete without[d];
     const rem = new Ledger(without, this.pattern, this.hireDate).paidRemaining(Shift.periodEnd(ym));
