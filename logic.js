@@ -394,7 +394,7 @@ const Salary = {
     const w = {
       honkyu: Salary.round(p.uriage * rate / 100),
       seikin: ok && p.noAbsence ? 10000 : 0,
-      mujiko: ok && p.noAccident && Salary.sekininCleared(p) ? (isNew ? 8100 : 5000) : 0,   // 責任出番に届かない月は無事故手当なし
+      mujiko: ok && p.noAccident ? (isNew ? 8100 : 5000) : 0,   // 責任出番に届かない月は画面側でチェックを外す（手で入れ直すこともできる）
       tsukin: ok ? Salary.tsukin(p) : 0,
       kyouiku: p.meeting ? 2000 : 0,
       koushutsuTeate: Salary.koushutsuTeate(p.kind, p.koushutsu),

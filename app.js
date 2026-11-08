@@ -651,11 +651,22 @@ function renderSalary() {
   v.querySelectorAll('input[name=sek]').forEach(r => r.addEventListener('change', () => { st.sekinin = r.value === '1'; renderSalaryDynamic(); }));
   v.querySelectorAll('input[name=kbn]').forEach(r => r.addEventListener('change', () => { updateSettings(s => Object.assign(s, { nikkin: r.value === '1' })); renderSalaryDynamic(); }));
   v.querySelector('#noAbsence').addEventListener('change', e => { st.noAbsence = e.target.checked; renderSalaryDynamic(); });
-  v.querySelector('#noAccident').addEventListener('change', e => { updateSettings(s => Object.assign(s, { noAccident: e.target.checked })); renderSalaryDynamic(); });
+  v.querySelector('#noAccident').addEventListener('change', e => {
+    // 責任出番に届いている時は普段の設定として保存。届いていない時はこの画面の中だけの変更にする
+    if (salaryCleared()) updateSettings(s => Object.assign(s, { noAccident: e.target.checked }));
+    else st.accOverride = e.target.checked;
+    renderSalaryDynamic();
+  });
   v.querySelector('#meeting').addEventListener('change', e => { updateSettings(s => Object.assign(s, { meeting: e.target.checked })); renderSalaryDynamic(); });
   v.querySelectorAll('[data-rt]').forEach(b => b.addEventListener('click', () => rateTable(b.dataset.rt)));
   function changeMonth(delta) { st.payYm += delta; const m = ymM(st.payYm); st.sekinin = !(m === 1 || m === 5); renderSalaryDynamic(); }
   renderSalaryDynamic();
+}
+function salaryNum(x) { const n = parseInt(String(x).replace(/,/g, '').trim(), 10); return Number.isFinite(n) ? n : 0; }
+/** 責任出番をクリアしているか（乗務数＋有給） */
+function salaryCleared() {
+  const st = salaryState;
+  return Salary.sekininCleared({ kind: salaryKind(), sekinin: st.sekinin, jyoumusu: salaryNum(st.jyoumusu), yuukyu: salaryNum(st.yuukyu) });
 }
 function renderSalaryDynamic() {
   const v = $('#salaryView'); if (v.hidden || !salaryState) return;
@@ -664,15 +675,14 @@ function renderSalaryDynamic() {
   const pension = Pension.entryFor(s.pensionHistory, st.payYm);
   const needReview = Pension.needsReview(s.pensionHistory, st.payYm, s.pensionConfirmed);
   const kind = salaryKind();
+  // 責任出番に届かない月は「事故なし」を外す。ただし手でチェックを入れ直せば無事故手当を付ける
+  const cleared = salaryCleared();
+  const noAccident = cleared ? s.noAccident : st.accOverride === true;
   const r = Salary.calc({ year: ymY(st.payYm), month: ymM(st.payYm), kind, uriage: num(st.uriage), koushutsu: num(st.koushutsu),
-    jyoumusu: num(st.jyoumusu), yuukyu: num(st.yuukyu), noAbsence: st.noAbsence, noAccident: s.noAccident, meeting: s.meeting,
+    jyoumusu: num(st.jyoumusu), yuukyu: num(st.yuukyu), noAbsence: st.noAbsence, noAccident, meeting: s.meeting,
     hyoujyun: pension ? pension.hyoujyun : 0, sekinin: st.sekinin });
   const w = r.main;
-  // 責任出番に届かない月は「事故なし」のチェックを外して触れないようにする（保存している設定は変えない。届けば元に戻る）
-  const cleared = Salary.sekininCleared({ kind, sekinin: st.sekinin, jyoumusu: num(st.jyoumusu), yuukyu: num(st.yuukyu) });
-  const na = v.querySelector('#noAccident');
-  na.checked = s.noAccident && cleared; na.disabled = !cleared;
-  na.closest('.frow').style.opacity = cleared ? '' : '.5';
+  v.querySelector('#noAccident').checked = noAccident;
   const badge = (t, bg, fg) => `<span class="badge" style="background:${bg};color:${fg}">${t}</span>`;
   const irow = (l, val) => `<div class="irow"><span>${l}</span><b>${val}</b></div>`;
   const d = r.diff, col = d > 0 ? '#2F855A' : d < 0 ? '#C53030' : 'gray', sg = d >= 0 ? '+' : '-';
@@ -682,7 +692,7 @@ function renderSalaryDynamic() {
     badge(r.isNewWage ? '新賃金適用' : '旧賃金適用', r.isNewWage ? '#E7F7ED' : '#E8F3FC', r.isNewWage ? '#1F8A4C' : 'var(--blue)') + '</div>' +
     (r.note ? `<div style="color:#C53030;font-weight:700">${r.note}</div>` : '') +
     irow('本給・深夜手当・時間外手当', yen(w.honkyu) + '円') + irow('精勤手当', yen(w.seikin) + '円') + irow('無事故手当', yen(w.mujiko) + '円') +
-    (!cleared ? `<div class="note">※責任出番（${Salary.sekininCount({ kind, sekinin: st.sekinin })}回）に届いていないため、無事故手当は付きません（乗務数＋有給で判定）</div>` : '') +
+    (!cleared && !noAccident ? `<div class="note">※責任出番（${Salary.sekininCount({ kind, sekinin: st.sekinin })}回）に届いていないため、無事故手当は付きません（乗務数＋有給で判定）</div>` : '') +
     irow('通勤手当', yen(w.tsukin) + '円') + irow('教育手当', yen(w.kyouiku) + '円') + irow('公出手当（65%）', yen(w.koushutsuTeate) + '円') +
     irow('有給手当', yen(w.yuukyuTeate) + '円') + irow('歩率（手当除く）', w.rate.toFixed(2) + '%') +
     `<div class="total"><span>総支給額</span><span class="n">${yen(w.total)}円</span></div>` +
