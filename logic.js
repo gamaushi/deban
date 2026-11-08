@@ -383,6 +383,10 @@ const Salary = {
   round: x => Math.floor(x + 0.5),
   koushutsuTeate: (kind, k) => kind === 'kakujitsu' ? Salary.round(k * 0.65) : Math.ceil(k * 0.65),
   yuukyuTeate: p => p.yuukyu * (p.kind === 'kakujitsu' ? 2 : 1) * Math.floor(p.hyoujyun / 300) * 10,
+  /** 責任出番の回数（隔日勤務 11/10回、日勤・夜勤 22/20回） */
+  sekininCount: p => p.kind === 'kakujitsu' ? (p.sekinin ? 11 : 10) : (p.sekinin ? 22 : 20),
+  /** 責任出番をクリアしたか（乗務数＋有給） */
+  sekininCleared: p => (p.jyoumusu + p.yuukyu) >= Salary.sekininCount(p),
   tsukin: p => Math.min(p.jyoumusu * (p.kind === 'kakujitsu' ? 500 : 250), p.sekinin ? 5500 : 5000),
   wage(p, isNew) {
     const rate = isNew ? Salary.newRate(p.kind, p.uriage) : Salary.oldRate(p.kind, p.uriage, p.sekinin);
@@ -390,7 +394,7 @@ const Salary = {
     const w = {
       honkyu: Salary.round(p.uriage * rate / 100),
       seikin: ok && p.noAbsence ? 10000 : 0,
-      mujiko: ok && p.noAccident ? (isNew ? 8100 : 5000) : 0,
+      mujiko: ok && p.noAccident && Salary.sekininCleared(p) ? (isNew ? 8100 : 5000) : 0,   // 責任出番に届かない月は無事故手当なし
       tsukin: ok ? Salary.tsukin(p) : 0,
       kyouiku: p.meeting ? 2000 : 0,
       koushutsuTeate: Salary.koushutsuTeate(p.kind, p.koushutsu),

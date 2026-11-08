@@ -672,6 +672,7 @@ function renderSalaryDynamic() {
     badge(r.isNewWage ? '新賃金適用' : '旧賃金適用', r.isNewWage ? '#E7F7ED' : '#E8F3FC', r.isNewWage ? '#1F8A4C' : 'var(--blue)') + '</div>' +
     (r.note ? `<div style="color:#C53030;font-weight:700">${r.note}</div>` : '') +
     irow('本給・深夜手当・時間外手当', yen(w.honkyu) + '円') + irow('精勤手当', yen(w.seikin) + '円') + irow('無事故手当', yen(w.mujiko) + '円') +
+    (s.noAccident && !Salary.sekininCleared({ kind, sekinin: st.sekinin, jyoumusu: num(st.jyoumusu), yuukyu: num(st.yuukyu) }) ? `<div class="note">※責任出番（${Salary.sekininCount({ kind, sekinin: st.sekinin })}回）に届いていないため、無事故手当は付きません（乗務数＋有給で判定）</div>` : '') +
     irow('通勤手当', yen(w.tsukin) + '円') + irow('教育手当', yen(w.kyouiku) + '円') + irow('公出手当（65%）', yen(w.koushutsuTeate) + '円') +
     irow('有給手当', yen(w.yuukyuTeate) + '円') + irow('歩率（手当除く）', w.rate.toFixed(2) + '%') +
     `<div class="total"><span>総支給額</span><span class="n">${yen(w.total)}円</span></div>` +
