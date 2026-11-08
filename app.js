@@ -180,6 +180,8 @@ const Weather = {
 };
 
 // ===== 入力（AppViewModel.submit） =====
+/** 日勤・夜勤で有給を取れない日（土日祝） */
+function paidBlockedDay(date) { const w = dow(date); return w === 0 || w === 6 || Holidays.isHoliday(date); }
 function saveValue(date, value) {
   const p = pattern();
   const store = Object.assign({}, storeFor(p)); store[date] = value;
@@ -191,6 +193,7 @@ function submit(date, raw) {
   const p = pattern(), led = ledger();
   let info = null;
   if (Values.isAbsent(value) && p !== DAILY_NIGHT && !Shift.isShiftDay(date, p)) return { ok: false, msg: '⚠️ 欠勤は出番日にのみ入力できます。' };
+  if (Values.isPaid(value) && p === DAILY_NIGHT && paidBlockedDay(date)) return { ok: false, msg: '⚠️ 日勤・夜勤は土日祝に有給を取得できません。' };
   if (Values.isPaid(value)) {
     const warns = []; let pensionFrom = null;
     if (!data.hireDate) warns.push('入社年月日が未入力です。設定画面で入力してください。');
@@ -469,6 +472,8 @@ function dayDialog(d) {
   }
   if (grant) info += `<div style="font-size:14px;color:var(--orange)">㊒ 有給${grant.days}日付与（累計${grant.cumulative}日）　有給残：${grant.remainingShifts}出番</div>`;
   if (red) info += `<div style="font-size:14px;color:red">赤枠：残っている公出の日</div>`;
+  const noPaid = dn && paidBlockedDay(d);
+  if (noPaid) info += `<div style="font-size:14px;color:red">土日祝は有給を取得できません</div>`;
   info += `<div>現在の入力：${current === '' ? '（なし）' : esc(shortValue(current))}</div>`;
   const init = Values.isRevenue(current) ? String(Values.revenue(current)) : '';
   const words = dn ? ['出', '休', '有給', '欠勤', '出変', 'クリア'] : ['出', '有給', '欠勤', '出変', '休', 'クリア'];
@@ -476,7 +481,7 @@ function dayDialog(d) {
     `<div class="field" style="margin-top:6px"><label for="rev">営収（円）</label><div class="inwrap">` +
     `<input id="rev" class="inp" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" placeholder="例：45270" value="${init.length <= Values.MAX_DIGITS ? init : ''}">` +
     `<button class="clr" id="clr" aria-label="入力を消す" ${init ? '' : 'hidden'}>✕</button></div><div class="errtxt" id="err"></div></div>` +
-    `<div class="wbtns">${words.map(x => `<button data-w="${x}">${x}</button>`).join('')}</div>`;
+    `<div class="wbtns">${words.map(x => `<button data-w="${x}"${noPaid && x === '有給' ? ' disabled aria-label="有給（土日祝は取得できません）"' : ''}>${x}</button>`).join('')}</div>`;
   openDialog({
     title: `${dMonth(d)}月${dDay(d)}日（${WEEK[dow(d)]}）` + (hn ? `<div class="hn">${esc(hn)}</div>` : ''),
     body,
@@ -775,7 +780,7 @@ function renderSetting() {
       <li>背景色：濃い紫＝営収入力済み、薄い赤＝有給、赤＝欠勤。</li>
       <li>赤枠：まだ残っている公出の日。</li>
       <li>隔日：2026年4月19日以降、公出が残っている月に有給を入れると「公出消」（公出の取消し）になり、有給残は減りません。公出がなく有給残もないと入力できません。欠勤は出番日にだけ入力できます。</li>
-      <li>日勤・夜勤：空欄の平日は自動で「出」、土日祝は「休」が入ります。責任出番クリアの条件は 乗務回数＋有給取得数 ≧ 責任出番数（1月・5月は20回、他は22回）。</li>
+      <li>日勤・夜勤：空欄の平日は自動で「出」、土日祝は「休」が入ります。責任出番クリアの条件は 乗務回数＋有給取得数 ≧ 責任出番数（1月・5月は20回、他は22回）。土日祝は有給を取得できません。</li>
       <li>締め期間は前月19日〜当月18日。カレンダーの &lt;18&gt; が締め日です。</li>
       <li>上の年月をタップすると、好きな年月へ移動できます。</li>
     </ul></div>
