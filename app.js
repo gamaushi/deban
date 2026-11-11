@@ -247,17 +247,19 @@ function cellHtml(d, led, red, marks, today, simple) {
   const p = led.pattern, dn = p === DAILY_NIGHT;
   const value = led.displayValue(d);
   const w = dow(d), hol = Holidays.isHoliday(d), closing = dDay(d) === 18 && !simple;
-  const bg = dn ? (valueColor(value, true) || '#fff') : (Shift.isShiftDay(d, p) ? Shift.PATTERN_COLORS[p] : '#fff');
+  // 簡易表示（人に送る用）は「出番か休みか」だけ：出番＝同じ色、休み（休・有給・欠勤・公出消）＝白
+  const n = Values.norm(value);
+  const work = Values.isRevenue(value) || n === '出' || n === '出変';
+  const off = n === '休' || n === '休み' || n === '欠勤' || Values.isPaid(value) || n === '公出消';
+  const bg = simple
+    ? (dn ? (work ? 'var(--c-work)' : '#fff') : ((Shift.isShiftDay(d, p) && !off) || work ? Shift.PATTERN_COLORS[p] : '#fff'))
+    : dn ? (valueColor(value, true) || '#fff') : (Shift.isShiftDay(d, p) ? Shift.PATTERN_COLORS[p] : '#fff');
   const dnCls = ['dn', closing ? 'cl' : '', hol ? 'hol' : '', d === today ? 'td' : '', w === 0 ? 'su' : '', w === 6 ? 'sa' : ''].join(' ');
   const wx = Weather.data[d]; const wxIcon = wx ? Weather.icon(wx.code) : '';
-  let h = `<div class="cell day${red.has(d) ? ' red' : ''}" data-d="${d}" style="background:${bg}">` +
-    `<div class="r1"><span class="${dnCls}">${closing ? '&lt;18&gt;' : dDay(d)}</span>${marks.has(d) ? '<span class="gm">㊒</span>' : ''}<span class="sp"></span>` +
+  let h = `<div class="cell day${red.has(d) && !simple ? ' red' : ''}" data-d="${d}" style="background:${bg}">` +
+    `<div class="r1"><span class="${dnCls}">${closing ? '&lt;18&gt;' : dDay(d)}</span>${marks.has(d) && !simple ? '<span class="gm">㊒</span>' : ''}<span class="sp"></span>` +
     (wxIcon ? `<span class="wx${closing ? ' sm' : ''}">${wxIcon}</span>` : '') + '</div>';
-  if (simple) {
-    // 簡易表示では営収（金額）は出さない。有給・欠勤などの文字だけ出す
-    if (value !== '' && !Values.isWork(value) && !Values.isRevenue(value) && Values.norm(value) !== '休') h += `<div class="val bare">${esc(shortValue(value))}</div>`;
-    return h + '</div>';
-  }
+  if (simple) return h + '</div>';   // 金額・有給・欠勤などの文字は出さない
   const vbg = dn ? 'rgba(255,255,255,.13)' : (valueColor(value, false) || '#fff');
   h += `<div class="drv">${Shift.workingDrivers(d)}</div><div class="duty">${Shift.dutyOfficer(d)}</div>` +
     `<div class="val${Values.isRevenue(value) ? ' rev' : ''}" style="background:${vbg}">${esc(shortValue(value))}</div></div>`;
