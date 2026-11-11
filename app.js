@@ -626,8 +626,6 @@ function renderSalary() {
       <div class="note">※2026年7月分から新賃率適用</div>
       <div class="frow"><span class="lbl">責任出番</span>
         <label class="radio"><input type="radio" name="sek" value="1">${sekHi}回</label><label class="radio"><input type="radio" name="sek" value="0">${sekLo}回</label></div>
-      ${dn ? `<div class="frow"><span class="lbl">勤務区分</span>
-        <label class="radio"><input type="radio" name="kbn" value="1" ${data.settings.nikkin ? 'checked' : ''}>日勤</label><label class="radio"><input type="radio" name="kbn" value="0" ${data.settings.nikkin ? '' : 'checked'}>夜勤</label></div>` : ''}
       ${numField('uriage', '営業収入（円）')}
       ${numField('koushutsu', '公出営収（円）')}
       <div class="note">※責任出番を超えた分の営収（65%が公出手当）</div>
@@ -650,7 +648,11 @@ function renderSalary() {
   v.querySelector('#pm').onclick = () => changeMonth(-1);
   v.querySelector('#nm').onclick = () => changeMonth(1);
   v.querySelectorAll('input[name=sek]').forEach(r => r.addEventListener('change', () => { st.sekinin = r.value === '1'; renderSalaryDynamic(); }));
-  v.querySelectorAll('input[name=kbn]').forEach(r => r.addEventListener('change', () => { updateSettings(s => Object.assign(s, { nikkin: r.value === '1' })); renderSalaryDynamic(); }));
+  // 日勤・夜勤の切り替え（結果の見出しの行にある）。結果は描き直されるので、親要素で受ける
+  v.querySelector('#salResult').addEventListener('click', e => {
+    const b = e.target.closest('[data-kbn]'); if (!b) return;
+    updateSettings(s => Object.assign(s, { nikkin: b.dataset.kbn === '1' })); renderSalaryDynamic();
+  });
   v.querySelector('#noAbsence').addEventListener('change', e => { st.noAbsence = e.target.checked; renderSalaryDynamic(); });
   v.querySelector('#noAccident').addEventListener('change', e => {
     // 責任出番に届いている時は普段の設定として保存。届いていない時はこの画面の中だけの変更にする
@@ -689,7 +691,7 @@ function renderSalaryDynamic() {
   const d = r.diff, col = d > 0 ? '#2F855A' : d < 0 ? '#C53030' : 'gray', sg = d >= 0 ? '+' : '-';
   v.querySelector('#salResult').innerHTML =
     `<div class="hrow"><h2>${ymJp(st.payYm)}分給与</h2>` +
-    (dn ? badge(kind === 'nikkin' ? '日勤' : '夜勤', '#FFF1DE', '#C2670A') : '') +
+    (dn ? `<div class="kseg" role="group" aria-label="勤務区分"><button data-kbn="1" class="${kind === 'nikkin' ? 'on' : ''}">日勤</button><button data-kbn="0" class="${kind === 'nikkin' ? '' : 'on'}">夜勤</button></div>` : '') +
     badge(r.isNewWage ? '新賃金適用' : '旧賃金適用', r.isNewWage ? '#E7F7ED' : '#E8F3FC', r.isNewWage ? '#1F8A4C' : 'var(--blue)') + '</div>' +
     (r.note ? `<div style="color:#C53030;font-weight:700">${r.note}</div>` : '') +
     irow('本給・深夜手当・時間外手当', yen(w.honkyu) + '円') + irow('精勤手当', yen(w.seikin) + '円') + irow('無事故手当', yen(w.mujiko) + '円') +
