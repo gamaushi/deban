@@ -254,7 +254,8 @@ function cellHtml(d, led, red, marks, today, simple) {
     `<div class="r1"><span class="${dnCls}">${closing ? '&lt;18&gt;' : dDay(d)}</span>${marks.has(d) ? '<span class="gm">㊒</span>' : ''}<span class="sp"></span>` +
     (wxIcon ? `<span class="wx${closing ? ' sm' : ''}">${wxIcon}</span>` : '') + '</div>';
   if (simple) {
-    if (value !== '' && !Values.isWork(value) && Values.norm(value) !== '休') h += `<div class="val bare${Values.isRevenue(value) ? ' rev' : ''}">${esc(shortValue(value))}</div>`;
+    // 簡易表示では営収（金額）は出さない。有給・欠勤などの文字だけ出す
+    if (value !== '' && !Values.isWork(value) && !Values.isRevenue(value) && Values.norm(value) !== '休') h += `<div class="val bare">${esc(shortValue(value))}</div>`;
     return h + '</div>';
   }
   const vbg = dn ? 'rgba(255,255,255,.13)' : (valueColor(value, false) || '#fff');
