@@ -690,8 +690,11 @@ function renderSalaryDynamic() {
   const irow = (l, val) => `<div class="irow"><span>${l}</span><b>${val}</b></div>`;
   const d = r.diff, col = d > 0 ? '#2F855A' : d < 0 ? '#C53030' : 'gray', sg = d >= 0 ? '+' : '-';
   v.querySelector('#salResult').innerHTML =
+    // 日勤・夜勤は一番上の帯の色で区別（日勤＝オレンジ、夜勤＝紺）。右のボタンで切り替え
+    (dn ? (kind === 'nikkin'
+      ? `<div class="kband day"><b>☀ 日勤の給与</b><button data-kbn="0">夜勤に切替 ⇄</button></div>`
+      : `<div class="kband night"><b>🌙 夜勤の給与</b><button data-kbn="1">日勤に切替 ⇄</button></div>`) : '') +
     `<div class="hrow"><h2>${ymJp(st.payYm)}分給与</h2>` +
-    (dn ? `<div class="kseg" role="group" aria-label="勤務区分"><button data-kbn="1" class="${kind === 'nikkin' ? 'on' : ''}">日勤</button><button data-kbn="0" class="${kind === 'nikkin' ? '' : 'on'}">夜勤</button></div>` : '') +
     badge(r.isNewWage ? '新賃金適用' : '旧賃金適用', r.isNewWage ? '#E7F7ED' : '#E8F3FC', r.isNewWage ? '#1F8A4C' : 'var(--blue)') + '</div>' +
     (r.note ? `<div style="color:#C53030;font-weight:700">${r.note}</div>` : '') +
     irow('本給・深夜手当・時間外手当', yen(w.honkyu) + '円') + irow('精勤手当', yen(w.seikin) + '円') + irow('無事故手当', yen(w.mujiko) + '円') +

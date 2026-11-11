@@ -119,9 +119,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.12); padding: 14px; display: flex; flex-direction: column; gap: 6px; }
 .card h2 { margin: 0; font-size: 17px; }
 .hrow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.kseg { display: inline-flex; border: 1.5px solid #C2670A; border-radius: 8px; overflow: hidden; flex: none; }
-.kseg button { border: 0; background: #fff; color: #C2670A; font-size: 14px; font-weight: 700; padding: 4px 12px; }
-.kseg button.on { background: #C2670A; color: #fff; }
+.kband { margin: -14px -14px 4px; padding: 10px 14px; border-radius: 12px 12px 0 0; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kband b { font-size: 18px; }
+.kband.day { background: linear-gradient(90deg, #D9730D, #F0A03C); }
+.kband.night { background: linear-gradient(90deg, #1E2A5A, #3B4C8C); }
+.kband button { border: 1px solid rgba(255,255,255,.6); background: rgba(255,255,255,.18); color: #fff; border-radius: 20px; padding: 6px 12px; font-size: 14px; font-weight: 700; flex: none; }
+.kband button:active { background: rgba(255,255,255,.35); }
 .badge { font-size: 13px; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
 .irow { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #EEF2F6; font-variant-numeric: tabular-nums; }
 .irow b { font-weight: 500; }
