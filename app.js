@@ -731,7 +731,7 @@ function renderSalaryDynamic() {
 function rateTable(kind) {
   const nik = kind === 'nikkin';
   const tbl = nik ? Salary.RATES_NIKKIN : Salary.RATES_KAKUJITSU;
-  const man = v => (v / 10000).toFixed(v % 10000 ? 2 : 0).replace(/0$/, '') + '万';
+  const man = v => String(Number((v / 10000).toFixed(2))) + '万';   // 40万・43.7万・44.85万（末尾の0だけ消す）
   let rows = '';
   tbl.forEach((rate, i) => {
     rows += `<tr><td>${man(330000 + i * 10000)}〜</td><td>${man(379500 + i * 11500)}〜</td><td>${rate.toFixed(2)}%</td></tr>`;
