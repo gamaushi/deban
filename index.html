@@ -108,6 +108,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 .sitems span { white-space: nowrap; }
 .b { font-weight: 700; }
 .c-red { color: var(--red); } .c-green { color: var(--green); } .c-amber { color: var(--amber); } .c-orange { color: var(--orange); } .c-gray { color: gray; } .c-alert { color: red; }
+.sbtns { flex-basis: 100%; display: flex; gap: 8px; margin: 2px 0; }
+.sbtns .salbtn { padding: 5px 12px; }
+.salbtn.rvbtn { background: #7B1FA2; }
 .salbtn { background: #4CAF50; color: #fff; border: 0; border-radius: 4px; font-size: calc(13px * var(--k)); font-weight: 700; padding: 3px 10px; }
 
 /* ===== 給料・設定画面 ===== */
@@ -167,6 +170,8 @@ table.rt th { background: var(--label-bg); text-align: center; }
 /* ===== ダイアログ ===== */
 .ov { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; display: flex; align-items: center; justify-content: center;
   padding: calc(12px + var(--safe-t)) max(12px, var(--safe-r)) calc(12px + var(--safe-b)) max(12px, var(--safe-l)); }
+.rvt td, .rvt th { padding: 4px 6px; vertical-align: middle; }
+.rvt input[type=checkbox] { width: 20px; height: 20px; }
 .dlg { background: #fff; border-radius: 22px; width: 100%; max-width: 420px; max-height: 100%; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
 .dlg .dh { padding: 18px 20px 6px; font-size: 20px; font-weight: 700; }
 .dlg .db { padding: 4px 20px 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 6px; }
