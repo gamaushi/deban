@@ -220,7 +220,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 </script>
 <script>
 'use strict';
-const VERSION = 'v5.4 (Web版)';
+const VERSION = 'v5.5 (Web版)';
 
 /* ============================================================
    項目の定義（日報に表示される順番）
@@ -598,7 +598,13 @@ const MAX_SIDE = 3000;   // 送る写真の長い辺の最大ピクセル
 const JPEG_Q = 0.92;     // 送る写真の画質
 let lastPhotoUrl = null;
 
-$('shoot').addEventListener('click', () => { $('file').value = ''; $('file').click(); });
+// 合言葉がまだなら、撮影の前に聞く（撮影の後だと「読み取り中」の画面に隠れて見えなくなるため）。
+// 閉じて入れなかった時は、次からはそのまま撮影して端末で読み取る
+let passAsked = false;
+$('shoot').addEventListener('click', () => {
+  if (!conf.pass && !passAsked){ passAsked = true; openSettings('最初に合言葉を入れてください'); return; }
+  $('file').value = ''; $('file').click();
+});
 $('file').addEventListener('change', async e => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -651,8 +657,8 @@ function fileToCanvas(file){
 
 async function runOcr(blob, canvas){
   if (!conf.pass){
-    openSettings('最初に合言葉を入れてください');
-    if (conf.useLocal) await localRecognize(canvas, '端末(合言葉なし)');
+    if (conf.useLocal){ toast('合言葉がないので端末で読み取ります（⚙設定で合言葉を入れるとAzureで読めます）', 3500); await localRecognize(canvas, '端末(合言葉なし)'); }
+    else toast('合言葉がありません。⚙設定で入れてください', 3500);
     return;
   }
   setBusy(true, '読み取り中…');
@@ -835,7 +841,7 @@ $('setSave').addEventListener('click', async () => {
   }
   save(CONF_KEY, conf);
   show('setView', false);
-  toast(conf.pass ? '保存しました' : '保存しました（合言葉なし）', 2000);
+  toast(conf.pass ? '保存しました。「撮影」を押してください' : '保存しました（合言葉なし）', 2500);
 });
 
 // 今月の回数をタップすると残りを表示
