@@ -167,6 +167,8 @@ table.rt th { background: var(--label-bg); text-align: center; }
 /* ===== ダイアログ ===== */
 .ov { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; display: flex; align-items: center; justify-content: center;
   padding: calc(12px + var(--safe-t)) max(12px, var(--safe-r)) calc(12px + var(--safe-b)) max(12px, var(--safe-l)); }
+.rvt td, .rvt th { padding: 4px 6px; vertical-align: middle; }
+.rvt input[type=checkbox] { width: 20px; height: 20px; }
 .dlg { background: #fff; border-radius: 22px; width: 100%; max-width: 420px; max-height: 100%; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
 .dlg .dh { padding: 18px 20px 6px; font-size: 20px; font-weight: 700; }
 .dlg .db { padding: 4px 20px 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 6px; }

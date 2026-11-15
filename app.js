@@ -8,7 +8,10 @@ const jpDate = d => `${dYear(d)}年${dMonth(d)}月${dDay(d)}日`;
 const ymJp = ym => `${ymY(ym)}年${ymM(ym)}月`;
 
 // ===== 保存（端末内 localStorage。Android版と同じJSON形式） =====
-const LS_DATA = 'deban_data';
+// 試験版（/deban/beta/）は本物と別の場所に保存する。初めて開いた時だけ本物のデータをコピーする
+const BETA = /\/beta\//.test(location.pathname);
+const LS_DATA = BETA ? 'deban_data_beta' : 'deban_data';
+if (BETA && lsGet(LS_DATA) === null && lsGet('deban_data') !== null) lsSet(LS_DATA, lsGet('deban_data'));
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function loadData() {
@@ -788,6 +791,11 @@ function renderSetting() {
       <div style="font-size:13px;color:#666">※ 復元しても今のデータは消えません。空いている日だけ、バックアップの内容を戻します。</div>
       <div style="font-size:13px;color:#666">※ 機種変更の前は、保存したファイルを新しいスマホに移すか、Googleドライブなどに保存してください。</div>
     </div>
+    <div class="card" style="background:#F5F0FF"><h2>📷 営収リストを取り込む</h2>
+      <div style="font-size:14px">会社の端末の「指導用データ」（日付・売上の一覧）を撮影すると、日付ごとの営収をカレンダーに入れます。取り込む前に確認画面が出ます。</div>
+      <div class="hrow"><button class="btn" id="rvCam" style="background:#7B1FA2">📷 撮影する</button><button class="btn line" id="rvPick">🖼 写真から選ぶ</button></div>
+      <div style="font-size:13px;color:#666">※ 読み取りには合言葉が必要です（納金電卓と同じ）。${relayPass() ? '合言葉は入力済みです。' : '最初の1回だけ聞かれます。'}</div>
+    </div>
     <div class="card"><h2>🌤 天気</h2>
       <div style="font-size:14px">Open-Meteo（気象庁モデル優先）。予報は8時間ごとに自動更新、過去は実際の天気を表示します。地点：中央区役所付近</div>
       <div><button class="btn line" id="wxBtn"></button></div>
@@ -816,6 +824,8 @@ function renderSetting() {
   v.querySelector('#exp').onclick = () => exportBackup('download');
   const es = v.querySelector('#expShare'); if (es) es.onclick = () => exportBackup('share');
   v.querySelector('#imp').onclick = pickRestoreFile;
+  v.querySelector('#rvCam').onclick = () => pickRevenuePhoto(true);
+  v.querySelector('#rvPick').onclick = () => pickRevenuePhoto(false);
   v.querySelector('#wxBtn').onclick = () => Weather.refresh(true);
   renderSettingWeatherBtn();
 }
@@ -927,6 +937,149 @@ restoreInput.addEventListener('change', () => {
 });
 function pickRestoreFile() { restoreInput.value = ''; restoreInput.click(); }
 
+// ===== 営収リストの取り込み（写真 → Cloudflare中継 → Azure で読み取り）=====
+const RELAY_URL = 'https://nokin-ocr.admin11pm.workers.dev/';
+const RELAY_CONF = 'nokin_azure_v1';   // 合言葉は納金電卓と共通（同じサイトなので共有できる）
+function relayPass() { try { return JSON.parse(lsGet(RELAY_CONF) || '{}').pass || ''; } catch (e) { return ''; } }
+function setRelayPass(pass) {
+  let c = {}; try { c = JSON.parse(lsGet(RELAY_CONF) || '{}') || {}; } catch (e) {}
+  c.pass = pass; lsSet(RELAY_CONF, JSON.stringify(c));
+}
+async function relayPost(body, action, pass) {
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), action ? 10000 : 30000);
+  try {
+    const headers = { 'X-Pass': encodeURIComponent(pass) };
+    if (action) headers['X-Action'] = action; else headers['Content-Type'] = 'image/jpeg';
+    const res = await fetch(RELAY_URL, { method: 'POST', headers, body: body || undefined, signal: ctl.signal });
+    try { return await res.json(); } catch (e) { return { ok: 0, error: 'fail', message: `読み取りに失敗しました(コード${res.status})` }; }
+  } catch (e) { return { ok: 0, error: 'net', message: '通信できませんでした' }; }
+  finally { clearTimeout(timer); }
+}
+/** 合言葉を聞く（正しければ保存して返す。やめたら null） */
+function askRelayPass(msg) {
+  return new Promise(resolve => {
+    let done = false; const finish = v => { if (!done) { done = true; resolve(v); } };
+    openDialog({
+      title: '合言葉', dismissable: false,
+      body: `<div>${esc(msg || '山と言ったら？（納金電卓と同じ合言葉）')}</div>` +
+        '<input type="text" id="rpPass" class="inp" autocomplete="off" autocapitalize="off" spellcheck="false" style="-webkit-text-security:disc">' +
+        '<div id="rpErr" style="color:#C53030;font-size:13px"></div>',
+      buttons: [
+        { label: 'やめる', onClick: () => { finish(null); } },
+        { label: 'OK', cls: '', onClick: close => {
+          const el = document.querySelector('#rpPass'), pass = el.value.trim(); if (!pass) return false;
+          const err = document.querySelector('#rpErr'); err.textContent = '確認中…';
+          relayPost(null, 'check', pass).then(r => {
+            if (r.ok) { setRelayPass(pass); close(); finish(pass); }
+            else err.textContent = r.error === 'pass' ? '合言葉が違います' : r.message;
+          });
+          return false;
+        } }
+      ],
+      onMount: ov => setTimeout(() => ov.querySelector('#rpPass').focus(), 50)
+    });
+  });
+}
+function pickRevenuePhoto(camera) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  if (camera) inp.setAttribute('capture', 'environment');
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) readRevenuePhoto(f); };
+  inp.click();
+}
+/** 写真を長い辺3000pxまで、半分ずつ段階的に縮めてJPEGにする */
+function shrinkPhoto(file) {
+  return new Promise((ok, ng) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth, h = img.naturalHeight, sc = Math.min(1, 3000 / Math.max(w, h));
+      const tw = Math.round(w * sc), th = Math.round(h * sc);
+      let src = img, sw = w, sh = h;
+      while (sw / 2 >= tw && sh / 2 >= th) {
+        const t = document.createElement('canvas'); t.width = Math.round(sw / 2); t.height = Math.round(sh / 2);
+        const c = t.getContext('2d'); c.imageSmoothingQuality = 'high'; c.drawImage(src, 0, 0, t.width, t.height);
+        src = t; sw = t.width; sh = t.height;
+      }
+      const cv = document.createElement('canvas'); cv.width = tw; cv.height = th;
+      const cx = cv.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(src, 0, 0, tw, th);
+      URL.revokeObjectURL(url);
+      cv.toBlob(b => b ? ok(b) : ng(new Error('blob')), 'image/jpeg', 0.92);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); ng(new Error('img')); };
+    img.src = url;
+  });
+}
+async function readRevenuePhoto(file) {
+  let pass = relayPass() || await askRelayPass();
+  if (!pass) return;
+  const closeBusy = openDialog({ title: '読み取り中…', body: '<div>少しお待ちください（10秒ほど）</div>', buttons: [], dismissable: false });
+  let r;
+  try { r = await relayPost(await shrinkPhoto(file), null, pass); }
+  catch (e) { r = { ok: 0, error: 'bad', message: '写真を読み込めませんでした' }; }
+  closeBusy();
+  if (!r.ok && r.error === 'pass') {
+    setRelayPass('');
+    pass = await askRelayPass('合言葉が違います。入れ直してください'); if (!pass) return;
+    return readRevenuePhoto(file);
+  }
+  if (!r.ok) { toast('⚠️ ' + (r.message || '読み取りに失敗しました')); return; }
+  const rows = RevenueList.parse(RevenueList.lines(r.blocks || []), todayIso());
+  if (!rows.length) { toast('⚠️ 日付と売上を見つけられませんでした。一覧全体が写るように撮り直してください。'); return; }
+  confirmRevenueImport(rows);
+}
+/** 確認画面：読み取った日付・売上を一覧にし、チェックした行だけ取り込む。金額はその場で直せる */
+function confirmRevenueImport(rows) {
+  const p = pattern(), store = storeFor(p), dn = p === DAILY_NIGHT;
+  const items = rows.map(x => {
+    const cur = store[x.date] || '';
+    const curRev = Values.isRevenue(cur);
+    let st, on = true;
+    if (x.amount === null) { st = '読めず'; on = false; }
+    else if (curRev && Values.revenue(cur) === x.amount) { st = '同じ'; on = false; }
+    else if (curRev) st = '上書き';
+    else if (Values.isPaid(cur) || Values.isAbsent(cur) || Values.norm(cur) === '公出消') { st = '注意'; on = false; }
+    else st = '新規';
+    const offDay = !dn && !Shift.isShiftDay(x.date, p);
+    return Object.assign({}, x, { cur, st, on, offDay });
+  });
+  const stCol = { 新規: '#2F855A', 上書き: '#C2670A', 同じ: '#888', 注意: '#C53030', 読めず: '#C53030' };
+  const body = `<div style="font-size:13px;color:#555">チェックした行を取り込みます。金額が違う時は直してから取り込んでください。</div>
+    <div style="overflow-x:auto"><table class="rt rvt"><tr><th></th><th>日付</th><th>売上</th><th>今の値</th></tr>
+    ${items.map((x, i) => `<tr><td><input type="checkbox" data-i="${i}" ${x.on ? 'checked' : ''}></td>
+      <td style="white-space:nowrap">${dMonth(x.date)}/${dDay(x.date)}(${WEEK[dow(x.date)]})${x.offDay ? '<br><span style="font-size:11px;color:#C2670A">出番日でない</span>' : ''}</td>
+      <td><input class="inp rvamt" data-i="${i}" inputmode="numeric" value="${x.amount === null ? '' : x.amount}" style="width:6.5em;text-align:right;padding:4px"></td>
+      <td style="white-space:nowrap">${esc(x.cur ? shortValue(x.cur) : '－')}<br><b style="font-size:12px;color:${stCol[x.st]}">${x.st}</b></td></tr>`).join('')}
+    </table></div><div id="rvSum" style="font-weight:700"></div>`;
+  const sum = ov => {
+    let n = 0, t = 0;
+    ov.querySelectorAll('input[type=checkbox]').forEach(c => {
+      if (!c.checked) return; const v = parseInt(String(ov.querySelector(`.rvamt[data-i="${c.dataset.i}"]`).value).replace(/\D/g, ''), 10);
+      if (v > 0) { n++; t += v; }
+    });
+    ov.querySelector('#rvSum').textContent = `取り込む：${n}件　合計 ${yen(t)}円`;
+  };
+  openDialog({
+    title: `営収リストの取り込み（${items.length}件）`, body,
+    onMount: ov => { sum(ov); ov.addEventListener('input', () => sum(ov)); ov.addEventListener('change', () => sum(ov)); },
+    buttons: [
+      { label: 'やめる' },
+      { label: '取り込む', cls: '', onClick: () => {
+        const ov = document.querySelector('.rvt').closest('.ov');
+        const ns = Object.assign({}, storeFor(p)); let n = 0, bad = 0;
+        ov.querySelectorAll('input[type=checkbox]').forEach(c => {
+          if (!c.checked) return;
+          const x = items[+c.dataset.i];
+          const v = Values.normalizeInput(String(ov.querySelector(`.rvamt[data-i="${c.dataset.i}"]`).value).replace(/[^\d]/g, ''));
+          if (v === null || !Values.isRevenue(v)) { bad++; return; }
+          ns[x.date] = v; n++;
+        });
+        if (!n) { toast(bad ? '⚠️ 金額が正しくない行があります' : '取り込む行がありません'); return false; }
+        update(Object.assign({}, data, dn ? { dailyNight: ns } : { sales: ns }));
+        toast(`✅ ${n}件の営収を取り込みました` + (bad ? `（${bad}件は金額が正しくないため取り込んでいません）` : ''));
+      } }
+    ]
+  });
+}
+
 /** 起動時の案内：初めてなら復元の案内、データがあってバックアップが古ければ保存の案内 */
 function backupCheck() {
   if (document.querySelector('.ov') || currentView() !== 'cal') return;
@@ -996,5 +1149,11 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
     if (todayIso() !== lastDay) { lastDay = todayIso(); ledgerCache = null; if (!calHidden()) refreshMonths(); }
     Weather.refresh(false);
   });
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!BETA && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (BETA) {
+    const b = document.createElement('div');
+    b.textContent = '🧪 試験版（ここでの入力は本物のカレンダーに反映されません）';
+    b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:50;background:#7B1FA2;color:#fff;font-size:12px;text-align:center;padding:3px 4px calc(3px + env(safe-area-inset-bottom));pointer-events:none';
+    document.body.appendChild(b);
+  }
 })();

@@ -585,7 +585,75 @@ const Backup = {
   }
 };
 
+// ===== 営収リストの読み取り（会社の「指導用データ」画面の写真から 日付・売上 を取り出す）=====
+const RevenueList = {
+  /** 写真の傾き（各行の上辺の向きの中央値, ラジアン） */
+  tilt(blocks) {
+    const a = [];
+    for (const b of blocks) for (const l of (b.lines || [])) {
+      const p = l.boundingPolygon || []; if (p.length < 2) continue;
+      const dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
+      if (Math.hypot(dx, dy) < 30) continue;
+      const t = Math.atan2(dy, dx); if (Math.abs(t) < Math.PI / 4) a.push(t);
+    }
+    if (!a.length) return 0;
+    a.sort((x, y) => x - y); return a[Math.floor(a.length / 2)];
+  },
+  /** Azureの blocks を、傾きを直した {text, top, bottom, left} の行にする */
+  lines(blocks) {
+    const ang = RevenueList.tilt(blocks), c = Math.cos(-ang), s = Math.sin(-ang), out = [];
+    for (const b of blocks) for (const l of (b.lines || [])) {
+      const p = (l.boundingPolygon || []).map(q => ({ x: q.x * c - q.y * s, y: q.x * s + q.y * c }));
+      if (!p.length) continue;
+      const ys = p.map(q => q.y), xs = p.map(q => q.x);
+      const raw = String(l.text || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+      out.push({ raw, text: raw.replace(/ /g, ''), top: Math.min(...ys), bottom: Math.max(...ys), left: Math.min(...xs), right: Math.max(...xs) });
+    }
+    return out;
+  },
+  /** 月日から年を決める：今日に一番近い日（未来は7日先まで） */
+  yearOf(m, d, today) {
+    let best = null;
+    for (const y of [dYear(today) - 1, dYear(today), dYear(today) + 1]) {
+      if (d > monthLen(YM(y, m))) continue;
+      const day = iso(y, m, d);
+      const diff = toEpoch(day) - toEpoch(today);
+      if (diff > 7) continue;
+      if (best === null || Math.abs(diff) < Math.abs(toEpoch(best) - toEpoch(today))) best = day;
+    }
+    return best;
+  },
+  /**
+   * 行から {date, amount} の一覧を作る。日付「08/21」の行と同じ高さで、日付より右にある一番近い金額（売上の列）を組にする。
+   * 「17:03」のような時刻、2桁以下の数字（空車・実車の%）は金額にしない。
+   */
+  parse(lines, today) {
+    const dateRe = /^(\d{1,2})[\/／](\d{1,2})$/;
+    const amtRe = /^[¥￥]?(\d{1,3}(?:[,，.]\d{3})+|\d{3,6})円?$/;
+    const out = [], seen = new Set();
+    // 1行に「08/21 43,550 17:03 …」とまとめて読まれた時にも対応する
+    for (const l of lines) {
+      const m = (l.raw || '').match(/^(\d{1,2})[\/／](\d{1,2}) +[¥￥]?(\d{1,3}(?:[,，.]\d{3})+|\d{3,6})(?= |円|$)/);
+      if (m && !dateRe.test(l.text)) {
+        const date = RevenueList.yearOf(+m[1], +m[2], today);
+        if (date && !seen.has(date)) { seen.add(date); out.push({ date, amount: +m[3].replace(/\D/g, ''), top: l.top }); }
+      }
+    }
+    for (const l of lines) {
+      const m = l.text.match(dateRe); if (!m) continue;
+      const mo = +m[1], da = +m[2]; if (mo < 1 || mo > 12 || da < 1 || da > 31) continue;
+      const date = RevenueList.yearOf(mo, da, today); if (!date || seen.has(date)) continue;
+      const h = Math.max(l.bottom - l.top, 1), cy = (l.top + l.bottom) / 2;
+      const cands = lines.filter(o => o !== l && o.left > l.left && amtRe.test(o.text) && Math.abs((o.top + o.bottom) / 2 - cy) <= h * 0.7)
+        .sort((a, b) => a.left - b.left);
+      if (!cands.length) { out.push({ date, amount: null, top: l.top }); seen.add(date); continue; }
+      out.push({ date, amount: +cands[0].text.replace(/\D/g, ''), top: l.top }); seen.add(date);
+    }
+    return out.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0).map(({ date, amount }) => ({ date, amount }));
+  }
+};
+
 if (typeof module !== 'undefined') module.exports = {
   iso, toEpoch, fromEpoch, addDays, dow, parseDate, YM, ymY, ymM, ymOf, atDay, monthLen, ymStr, parseYm,
-  Values, Holidays, DAILY_NIGHT, Shift, PaidLeave, Ledger, Salary, Pension, Store, Backup
+  Values, Holidays, DAILY_NIGHT, Shift, PaidLeave, Ledger, Salary, Pension, Store, Backup, RevenueList
 };
