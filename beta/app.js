@@ -1054,23 +1054,24 @@ function confirmRevenueImport(rows) {
       || n === '出' || n === '出変' || curRev;
     const offDay = !workDay;
     if (x.out) { st = '期間外'; on = false; }
-    else if (offDay) { st = '出番日でない'; on = false; }
     else if (x.amount === null) { st = '読めず'; on = false; }
     else if (curRev && Values.revenue(cur) === x.amount) { st = '同じ'; on = false; }
     else if (curRev) st = '上書き';
     else if (Values.isPaid(cur) || Values.isAbsent(cur) || Values.norm(cur) === '公出消') { st = '注意'; on = false; }
     else st = '新規';
-    return Object.assign({}, x, { cur, st, on, lock: x.out || offDay });
+    // 期間外だけは取り込めない。出番日以外（出番変更・公出など）は、リストに載っていれば乗務した日なので取り込める
+    return Object.assign({}, x, { cur, st, on, offDay, lock: x.out });
   });
-  const stCol = { 新規: '#2F855A', 上書き: '#C2670A', 同じ: '#888', 注意: '#C53030', 読めず: '#C53030', 期間外: '#888', 出番日でない: '#888' };
+  const stCol = { 新規: '#2F855A', 上書き: '#C2670A', 同じ: '#888', 注意: '#C53030', 読めず: '#C53030', 期間外: '#888' };
   const body = `<div style="font-size:13px;color:#555">チェックした行を取り込みます。金額が違う時は直してから取り込んでください。</div>
     <div style="overflow-x:auto"><table class="rt rvt"><tr><th></th><th>日付</th><th>売上</th><th>今の値</th></tr>
     ${items.map((x, i) => `<tr${x.lock ? ' style="opacity:.5"' : ''}><td><input type="checkbox" data-i="${i}" ${x.on ? 'checked' : ''}${x.lock ? ' disabled' : ''}></td>
-      <td style="white-space:nowrap">${dMonth(x.date)}/${dDay(x.date)}(${WEEK[dow(x.date)]})</td>
+      <td style="white-space:nowrap">${dMonth(x.date)}/${dDay(x.date)}(${WEEK[dow(x.date)]})${x.offDay && !x.out ? '<br><span style="font-size:11px;color:#C2670A">出番日以外</span>' : ''}</td>
       <td><input class="inp rvamt" data-i="${i}" inputmode="numeric" value="${x.amount === null ? '' : x.amount}" style="width:6.5em;text-align:right;padding:4px"${x.lock ? ' disabled' : ''}></td>
       <td style="white-space:nowrap">${esc(x.cur ? shortValue(x.cur) : '－')}<br><b style="font-size:12px;color:${stCol[x.st]}">${x.st}</b></td></tr>`).join('')}
     </table></div><div id="rvSum" style="font-weight:700"></div>` +
-    (items.some(x => x.lock && !x.out) ? '<div style="font-size:12px;color:#666">※「出番日でない」日は取り込めません。出番変更で働いた日は、先にカレンダーでその日を「出変」にしてから取り込んでください。</div>' : '');
+    (items.some(x => x.offDay && !x.out) ? '<div style="font-size:12px;color:#666">※「出番日以外」は、出番日ではない日です。出番変更や公出で乗務した日なら、そのまま取り込んでください。</div>' : '') +
+    (items.some(x => x.out) ? '<div style="font-size:12px;color:#666">※「期間外」の日付は、この期間の取り込みには入りません。</div>' : '');
   const sum = ov => {
     let n = 0, t = 0;
     ov.querySelectorAll('input[type=checkbox]').forEach(c => {
