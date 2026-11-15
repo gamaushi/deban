@@ -297,6 +297,7 @@ function summaryHtml(s, p) {
   if (!s.dailyNight || s.extraCount > 0) { r3.push(it(`出番：${yen(s.baseRevenue)}円`)); r3.push(it(`公出：${yen(s.extraRevenue)}円`)); }
   r3.push(it(`月間：${yen(s.totalRevenue)}円`, 'b'));
   r3.push(`<button class="salbtn" data-sal="${s.ym}">給料計算</button>`);
+  r3.push(`<button class="salbtn rvbtn" data-rv="${s.ym}">📷 営収取込</button>`);
   return `<div class="sum">${row('期間情報', r1)}${row('回数集計', r2)}${row('営収集計', r3)}</div>`;
 }
 
@@ -428,6 +429,8 @@ $('#modeSw').addEventListener('click', e => {
 $('#title').addEventListener('click', () => monthPicker(topMonth()));
 $('#gear').addEventListener('click', () => go('setting'));
 monthsEl.addEventListener('click', e => {
+  const rv = e.target.closest('[data-rv]');
+  if (rv) { startRevenueImport(+rv.dataset.rv); return; }
   const sal = e.target.closest('[data-sal]');
   if (sal) { const ym = Number(sal.dataset.sal); salaryInput = ledger().summary(ym).salary; go('salary'); return; }
   const c = e.target.closest('.cell.day'); if (c) dayDialog(c.dataset.d);
@@ -791,11 +794,6 @@ function renderSetting() {
       <div style="font-size:13px;color:#666">※ 復元しても今のデータは消えません。空いている日だけ、バックアップの内容を戻します。</div>
       <div style="font-size:13px;color:#666">※ 機種変更の前は、保存したファイルを新しいスマホに移すか、Googleドライブなどに保存してください。</div>
     </div>
-    <div class="card" style="background:#F5F0FF"><h2>📷 営収リストを取り込む</h2>
-      <div style="font-size:14px">会社の端末の「指導用データ」（日付・売上の一覧）を撮影すると、日付ごとの営収をカレンダーに入れます。取り込む前に確認画面が出ます。</div>
-      <div class="hrow"><button class="btn" id="rvCam" style="background:#7B1FA2">📷 撮影する</button><button class="btn line" id="rvPick">🖼 写真から選ぶ</button></div>
-      <div style="font-size:13px;color:#666">※ 読み取りには合言葉が必要です（納金電卓と同じ）。${relayPass() ? '合言葉は入力済みです。' : '最初の1回だけ聞かれます。'}</div>
-    </div>
     <div class="card"><h2>🌤 天気</h2>
       <div style="font-size:14px">Open-Meteo（気象庁モデル優先）。予報は8時間ごとに自動更新、過去は実際の天気を表示します。地点：中央区役所付近</div>
       <div><button class="btn line" id="wxBtn"></button></div>
@@ -824,8 +822,6 @@ function renderSetting() {
   v.querySelector('#exp').onclick = () => exportBackup('download');
   const es = v.querySelector('#expShare'); if (es) es.onclick = () => exportBackup('share');
   v.querySelector('#imp').onclick = pickRestoreFile;
-  v.querySelector('#rvCam').onclick = () => pickRevenuePhoto(true);
-  v.querySelector('#rvPick').onclick = () => pickRevenuePhoto(false);
   v.querySelector('#wxBtn').onclick = () => Weather.refresh(true);
   renderSettingWeatherBtn();
 }
@@ -980,6 +976,19 @@ function askRelayPass(msg) {
     });
   });
 }
+let revenueYm = null;   // 取り込む締め期間（給料の月）
+/** 集計欄の「営収取込」：その期間の営収リストを撮影するか、写真から選ぶ */
+function startRevenueImport(ym) {
+  revenueYm = ym;
+  const s = Shift.periodStart(ym), e = Shift.periodEnd(ym);
+  openDialog({
+    title: `📷 ${ymJp(ym)}分の営収取込`,
+    body: `<div>会社の端末の「指導用データ」（日付・売上の一覧）を撮影すると、<b>${dMonth(s)}/${dDay(s)}〜${dMonth(e)}/${dDay(e)}</b> の営収をカレンダーに入れます。</div>` +
+      '<div style="font-size:13px;color:#666">取り込む前に確認画面が出ます。この期間以外の日付は取り込みません。</div>' +
+      `<div style="font-size:13px;color:#666">※ 読み取りには合言葉が必要です（納金電卓と同じ）。${relayPass() ? '合言葉は入力済みです。' : '最初の1回だけ聞かれます。'}</div>`,
+    buttons: [{ label: 'やめる' }, { label: '🖼 写真から選ぶ', cls: 'line', onClick: () => { pickRevenuePhoto(false); } }, { label: '📷 撮影する', cls: '', onClick: () => { pickRevenuePhoto(true); } }]
+  });
+}
 function pickRevenuePhoto(camera) {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
   if (camera) inp.setAttribute('capture', 'environment');
@@ -1022,7 +1031,9 @@ async function readRevenuePhoto(file) {
     return readRevenuePhoto(file);
   }
   if (!r.ok) { toast('⚠️ ' + (r.message || '読み取りに失敗しました')); return; }
-  const rows = RevenueList.parse(RevenueList.lines(r.blocks || []), todayIso());
+  const range = revenueYm ? { start: Shift.periodStart(revenueYm), end: Shift.periodEnd(revenueYm) } : null;
+  const rows = RevenueList.parse(RevenueList.lines(r.blocks || []), todayIso(), range)
+    .map(x => Object.assign(x, { out: !!range && (x.date < range.start || x.date > range.end) }));
   if (!rows.length) { toast('⚠️ 日付と売上を見つけられませんでした。一覧全体が写るように撮り直してください。'); return; }
   confirmRevenueImport(rows);
 }
@@ -1033,7 +1044,8 @@ function confirmRevenueImport(rows) {
     const cur = store[x.date] || '';
     const curRev = Values.isRevenue(cur);
     let st, on = true;
-    if (x.amount === null) { st = '読めず'; on = false; }
+    if (x.out) { st = '期間外'; on = false; }
+    else if (x.amount === null) { st = '読めず'; on = false; }
     else if (curRev && Values.revenue(cur) === x.amount) { st = '同じ'; on = false; }
     else if (curRev) st = '上書き';
     else if (Values.isPaid(cur) || Values.isAbsent(cur) || Values.norm(cur) === '公出消') { st = '注意'; on = false; }
@@ -1041,7 +1053,7 @@ function confirmRevenueImport(rows) {
     const offDay = !dn && !Shift.isShiftDay(x.date, p);
     return Object.assign({}, x, { cur, st, on, offDay });
   });
-  const stCol = { 新規: '#2F855A', 上書き: '#C2670A', 同じ: '#888', 注意: '#C53030', 読めず: '#C53030' };
+  const stCol = { 新規: '#2F855A', 上書き: '#C2670A', 同じ: '#888', 注意: '#C53030', 読めず: '#C53030', 期間外: '#888' };
   const body = `<div style="font-size:13px;color:#555">チェックした行を取り込みます。金額が違う時は直してから取り込んでください。</div>
     <div style="overflow-x:auto"><table class="rt rvt"><tr><th></th><th>日付</th><th>売上</th><th>今の値</th></tr>
     ${items.map((x, i) => `<tr><td><input type="checkbox" data-i="${i}" ${x.on ? 'checked' : ''}></td>
@@ -1058,7 +1070,7 @@ function confirmRevenueImport(rows) {
     ov.querySelector('#rvSum').textContent = `取り込む：${n}件　合計 ${yen(t)}円`;
   };
   openDialog({
-    title: `営収リストの取り込み（${items.length}件）`, body,
+    title: `${revenueYm ? ymJp(revenueYm) + '分 ' : ''}営収の取り込み（${items.length}件）`, body,
     onMount: ov => { sum(ov); ov.addEventListener('input', () => sum(ov)); ov.addEventListener('change', () => sum(ov)); },
     buttons: [
       { label: 'やめる' },

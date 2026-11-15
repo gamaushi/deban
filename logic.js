@@ -611,8 +611,15 @@ const RevenueList = {
     }
     return out;
   },
-  /** 月日から年を決める：今日に一番近い日（未来は7日先まで） */
-  yearOf(m, d, today) {
+  /** 月日から年を決める。range（締め期間）があれば、その期間に入る年を選ぶ。なければ今日に一番近い日（未来は7日先まで） */
+  yearOf(m, d, today, range) {
+    if (range) {
+      for (let y = dYear(range.start); y <= dYear(range.end); y++) {
+        if (d > monthLen(YM(y, m))) continue;
+        const day = iso(y, m, d);
+        if (day >= range.start && day <= range.end) return day;
+      }
+    }
     let best = null;
     for (const y of [dYear(today) - 1, dYear(today), dYear(today) + 1]) {
       if (d > monthLen(YM(y, m))) continue;
@@ -627,7 +634,7 @@ const RevenueList = {
    * 行から {date, amount} の一覧を作る。日付「08/21」の行と同じ高さで、日付より右にある一番近い金額（売上の列）を組にする。
    * 「17:03」のような時刻、2桁以下の数字（空車・実車の%）は金額にしない。
    */
-  parse(lines, today) {
+  parse(lines, today, range) {
     const dateRe = /^(\d{1,2})[\/／](\d{1,2})$/;
     const amtRe = /^[¥￥]?(\d{1,3}(?:[,，.]\d{3})+|\d{3,6})円?$/;
     const out = [], seen = new Set();
@@ -635,14 +642,14 @@ const RevenueList = {
     for (const l of lines) {
       const m = (l.raw || '').match(/^(\d{1,2})[\/／](\d{1,2}) +[¥￥]?(\d{1,3}(?:[,，.]\d{3})+|\d{3,6})(?= |円|$)/);
       if (m && !dateRe.test(l.text)) {
-        const date = RevenueList.yearOf(+m[1], +m[2], today);
+        const date = RevenueList.yearOf(+m[1], +m[2], today, range);
         if (date && !seen.has(date)) { seen.add(date); out.push({ date, amount: +m[3].replace(/\D/g, ''), top: l.top }); }
       }
     }
     for (const l of lines) {
       const m = l.text.match(dateRe); if (!m) continue;
       const mo = +m[1], da = +m[2]; if (mo < 1 || mo > 12 || da < 1 || da > 31) continue;
-      const date = RevenueList.yearOf(mo, da, today); if (!date || seen.has(date)) continue;
+      const date = RevenueList.yearOf(mo, da, today, range); if (!date || seen.has(date)) continue;
       const h = Math.max(l.bottom - l.top, 1), cy = (l.top + l.bottom) / 2;
       const cands = lines.filter(o => o !== l && o.left > l.left && amtRe.test(o.text) && Math.abs((o.top + o.bottom) / 2 - cy) <= h * 0.7)
         .sort((a, b) => a.left - b.left);
