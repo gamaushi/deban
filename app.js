@@ -978,8 +978,10 @@ function askRelayPass(msg) {
 }
 let revenueYm = null;   // 取り込む締め期間（給料の月）
 /** 集計欄の「営収取込」：その期間の営収リストを撮影するか、写真から選ぶ */
-function startRevenueImport(ym) {
+async function startRevenueImport(ym) {
   revenueYm = ym;
+  // 合言葉は撮影の前に聞く（撮影の後に聞くと、iPhoneでは見えないまま止まることがある）
+  if (!relayPass() && !(await askRelayPass())) return;
   const s = Shift.periodStart(ym), e = Shift.periodEnd(ym);
   openDialog({
     title: `📷 ${ymJp(ym)}分の営収取込`,
@@ -990,9 +992,11 @@ function startRevenueImport(ym) {
   });
 }
 function pickRevenuePhoto(camera) {
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  // iPhoneのSafariは画面に置いていない部品だと「選んだ」合図が来ないことがあるので、隠して置いてから使う
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.hidden = true;
   if (camera) inp.setAttribute('capture', 'environment');
-  inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) readRevenuePhoto(f); };
+  inp.onchange = () => { const f = inp.files && inp.files[0]; inp.remove(); if (f) readRevenuePhoto(f); };
+  document.body.appendChild(inp);
   inp.click();
 }
 /** 写真を長い辺3000pxまで、半分ずつ段階的に縮めてJPEGにする */
