@@ -1062,6 +1062,9 @@ function confirmRevenueImport(rows) {
     // 期間外だけは取り込めない。出番日以外（出番変更・公出など）は、リストに載っていれば乗務した日なので取り込める
     return Object.assign({}, x, { cur, st, on, offDay, lock: x.out });
   });
+  // 期間の中で、カレンダーには営収があるのにリストに載っていない日（入れ間違いに気づけるように）
+  const listed = new Set(rows.map(x => x.date));
+  const notListed = revenueYm ? Object.keys(store).filter(d => d >= Shift.periodStart(revenueYm) && d <= Shift.periodEnd(revenueYm) && Values.isRevenue(store[d]) && !listed.has(d)).sort() : [];
   const stCol = { 新規: '#2F855A', 上書き: '#C2670A', 同じ: '#888', 注意: '#C53030', 読めず: '#C53030', 期間外: '#888' };
   const body = `<div style="font-size:13px;color:#555">チェックした行を取り込みます。金額が違う時は直してから取り込んでください。</div>
     <div style="overflow-x:auto"><table class="rt rvt"><tr><th></th><th>日付</th><th>売上</th><th>今の値</th></tr>
@@ -1070,6 +1073,7 @@ function confirmRevenueImport(rows) {
       <td><input class="inp rvamt" data-i="${i}" inputmode="numeric" value="${x.amount === null ? '' : x.amount}" style="width:6.5em;text-align:right;padding:4px"${x.lock ? ' disabled' : ''}></td>
       <td style="white-space:nowrap">${esc(x.cur ? shortValue(x.cur) : '－')}<br><b style="font-size:12px;color:${stCol[x.st]}">${x.st}</b></td></tr>`).join('')}
     </table></div><div id="rvSum" style="font-weight:700"></div>` +
+    (notListed.length ? `<div style="background:#FFF4E5;border:1px solid #F0A03C;border-radius:8px;padding:6px 8px;font-size:13px">⚠️ <b>リストにない日に営収が入っています</b><br>${notListed.map(d => `${dMonth(d)}/${dDay(d)}(${WEEK[dow(d)]}) ${yen(Values.revenue(store[d]))}円`).join('<br>')}<br><span style="color:#666">入れ間違いでないか、カレンダーで確認してください（ここでは消しません）。リストの写真に写っていない行がないかも確認してください。</span></div>` : '') +
     (items.some(x => x.offDay && !x.out) ? '<div style="font-size:12px;color:#666">※「出番日以外」は、出番日ではない日です。出番変更や公出で乗務した日なら、そのまま取り込んでください。</div>' : '') +
     (items.some(x => x.out) ? '<div style="font-size:12px;color:#666">※「期間外」の日付は、この期間の取り込みには入りません。</div>' : '');
   const sum = ov => {
