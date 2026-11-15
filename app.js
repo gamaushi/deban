@@ -794,6 +794,11 @@ function renderSetting() {
       <div style="font-size:13px;color:#666">※ 復元しても今のデータは消えません。空いている日だけ、バックアップの内容を戻します。</div>
       <div style="font-size:13px;color:#666">※ 機種変更の前は、保存したファイルを新しいスマホに移すか、Googleドライブなどに保存してください。</div>
     </div>
+    <div class="card"><h2>🔑 合言葉（営収取込）</h2>
+      <div style="font-size:14px">営収リストの読み取りに使います。納金電卓と同じ合言葉で、どちらかで入れれば両方で使えます。</div>
+      <div id="rpState" style="font-weight:700"></div>
+      <div class="hrow"><button class="btn" id="rpSet"></button><button class="btn line" id="rpDel">消す</button></div>
+    </div>
     <div class="card"><h2>🌤 天気</h2>
       <div style="font-size:14px">Open-Meteo（気象庁モデル優先）。予報は8時間ごとに自動更新、過去は実際の天気を表示します。地点：中央区役所付近</div>
       <div><button class="btn line" id="wxBtn"></button></div>
@@ -822,6 +827,19 @@ function renderSetting() {
   v.querySelector('#exp').onclick = () => exportBackup('download');
   const es = v.querySelector('#expShare'); if (es) es.onclick = () => exportBackup('share');
   v.querySelector('#imp').onclick = pickRestoreFile;
+  const rpShow = () => {
+    const has = !!relayPass();
+    v.querySelector('#rpState').innerHTML = has ? '<span style="color:#2F855A">✅ 入力済み</span>' : '<span style="color:#C53030">未入力</span>';
+    v.querySelector('#rpSet').textContent = has ? '変更する' : '入力する';
+    v.querySelector('#rpDel').style.display = has ? '' : 'none';
+  };
+  rpShow();
+  v.querySelector('#rpSet').onclick = async () => { if (await askRelayPass('合言葉を入れてください（山と言ったら？）')) toast('✅ 合言葉を保存しました'); rpShow(); };
+  v.querySelector('#rpDel').onclick = () => openDialog({
+    title: '合言葉を消しますか？',
+    body: '<div>このスマホに保存した合言葉を消します。納金電卓の合言葉も一緒に消えます。</div>',
+    buttons: [{ label: 'やめる' }, { label: '消す', cls: 'danger', onClick: () => { setRelayPass(''); rpShow(); toast('合言葉を消しました'); } }]
+  });
   v.querySelector('#wxBtn').onclick = () => Weather.refresh(true);
   renderSettingWeatherBtn();
 }
