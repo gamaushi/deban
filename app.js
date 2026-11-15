@@ -1035,8 +1035,13 @@ async function readRevenuePhoto(file) {
     return readRevenuePhoto(file);
   }
   if (!r.ok) { toast('⚠️ ' + (r.message || '読み取りに失敗しました')); return; }
+  revenueLines = RevenueList.lines(r.blocks || []);
+  showRevenueRows();
+}
+let revenueLines = null;   // 最後に読み取った行（期間を変えて取り込み直す時に使う）
+function showRevenueRows() {
   const range = revenueYm ? { start: Shift.periodStart(revenueYm), end: Shift.periodEnd(revenueYm) } : null;
-  const rows = RevenueList.parse(RevenueList.lines(r.blocks || []), todayIso(), range)
+  const rows = RevenueList.parse(revenueLines, todayIso(), range)
     .map(x => Object.assign(x, { out: !!range && (x.date < range.start || x.date > range.end) }));
   if (!rows.length) { toast('⚠️ 日付と売上を見つけられませんでした。一覧全体が写るように撮り直してください。'); return; }
   confirmRevenueImport(rows);
@@ -1066,7 +1071,16 @@ function confirmRevenueImport(rows) {
   const listed = new Set(rows.map(x => x.date));
   const notListed = revenueYm ? Object.keys(store).filter(d => d >= Shift.periodStart(revenueYm) && d <= Shift.periodEnd(revenueYm) && Values.isRevenue(store[d]) && !listed.has(d)).sort() : [];
   const stCol = { 新規: '#2F855A', 上書き: '#C2670A', 同じ: '#888', 注意: '#C53030', 読めず: '#C53030', 期間外: '#888' };
-  const body = `<div style="font-size:13px;color:#555">チェックした行を取り込みます。金額が違う時は直してから取り込んでください。</div>
+  // 全部が期間外なら、リストの日付から何月分かを推定して、その期間で取り込み直せるようにする
+  let guessYm = null;
+  if (revenueYm && items.length && items.every(x => x.out)) {
+    const cnt = {};
+    for (const x of items) { const ym = Shift.periodMonthOf(x.date); cnt[ym] = (cnt[ym] || 0) + 1; }
+    guessYm = +Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    if (guessYm === revenueYm) guessYm = null;
+  }
+  const body = (guessYm ? `<div style="background:#FFF4E5;border:1px solid #F0A03C;border-radius:8px;padding:8px;font-size:14px">⚠️ 読み取った日付は、すべて${ymJp(revenueYm)}分の期間外です。<b>${ymJp(guessYm)}分</b>のリストではありませんか？<div style="margin-top:6px"><button class="btn" id="rvRetry" style="background:#7B1FA2">${ymJp(guessYm)}分として取り込む</button></div></div>` : '') +
+    `<div style="font-size:13px;color:#555">チェックした行を取り込みます。金額が違う時は直してから取り込んでください。</div>
     <div style="overflow-x:auto"><table class="rt rvt"><tr><th></th><th>日付</th><th>売上</th><th>今の値</th></tr>
     ${items.map((x, i) => `<tr${x.lock ? ' style="opacity:.5"' : ''}><td><input type="checkbox" data-i="${i}" ${x.on ? 'checked' : ''}${x.lock ? ' disabled' : ''}></td>
       <td style="white-space:nowrap">${dMonth(x.date)}/${dDay(x.date)}(${WEEK[dow(x.date)]})${x.offDay && !x.out ? '<br><span style="font-size:11px;color:#C2670A">出番日以外</span>' : ''}</td>
@@ -1086,7 +1100,11 @@ function confirmRevenueImport(rows) {
   };
   openDialog({
     title: `${revenueYm ? ymJp(revenueYm) + '分 ' : ''}営収の取り込み（${items.length}件）`, body,
-    onMount: ov => { sum(ov); ov.addEventListener('input', () => sum(ov)); ov.addEventListener('change', () => sum(ov)); },
+    onMount: (ov, close) => {
+      sum(ov); ov.addEventListener('input', () => sum(ov)); ov.addEventListener('change', () => sum(ov));
+      const rt = ov.querySelector('#rvRetry');
+      if (rt) rt.onclick = () => { close(); revenueYm = guessYm; showRevenueRows(); };
+    },
     buttons: [
       { label: 'やめる' },
       { label: '取り込む', cls: '', onClick: () => {
@@ -1099,7 +1117,8 @@ function confirmRevenueImport(rows) {
           if (v === null || !Values.isRevenue(v)) { bad++; return; }
           ns[x.date] = v; n++;
         });
-        if (!n) { toast(bad ? '⚠️ 金額が正しくない行があります' : '取り込む行がありません'); return false; }
+        if (bad && !n) { toast('⚠️ 金額が正しくない行があります。直してから取り込んでください'); return false; }
+        if (!n) { toast('取り込むデータがなかったので、何も変えていません'); return; }   // 閉じてカレンダーに戻る
         update(Object.assign({}, data, dn ? { dailyNight: ns } : { sales: ns }));
         toast(`✅ ${n}件の営収を取り込みました` + (bad ? `（${bad}件は金額が正しくないため取り込んでいません）` : ''));
       } }
