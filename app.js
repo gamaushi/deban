@@ -958,7 +958,8 @@ function askRelayPass(msg) {
     openDialog({
       title: '合言葉', dismissable: false,
       body: `<div>${esc(msg || '山と言ったら？（納金電卓と同じ合言葉）')}</div>` +
-        '<input type="text" id="rpPass" class="inp" autocomplete="off" autocapitalize="off" spellcheck="false" style="-webkit-text-security:disc">' +
+        '<input type="text" id="rpPass" class="inp" autocomplete="off" autocapitalize="off" spellcheck="false" style="-webkit-text-security:disc;text-security:disc">' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="rpShow" style="width:20px;height:20px">合言葉を表示する</label>' +
         '<div id="rpErr" style="color:#C53030;font-size:13px"></div>',
       buttons: [
         { label: 'やめる', onClick: () => { finish(null); } },
@@ -972,7 +973,11 @@ function askRelayPass(msg) {
           return false;
         } }
       ],
-      onMount: ov => setTimeout(() => ov.querySelector('#rpPass').focus(), 50)
+      onMount: ov => {
+        const el = ov.querySelector('#rpPass');
+        ov.querySelector('#rpShow').onchange = e => { const v = e.target.checked ? 'none' : 'disc'; el.style.webkitTextSecurity = v; el.style.textSecurity = v; };
+        setTimeout(() => el.focus(), 50);
+      }
     });
   });
 }
