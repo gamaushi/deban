@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2分 腹筋ワークアウト</title>
+<meta name="theme-color" content="#101318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="2分腹筋">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<style>
+:root{--bg:#101318;--card:#1a1f27;--line:#2a313c;--text:#eef2f6;--sub:#9aa6b4;--work:#4fd1e8;--rest:#ffa94d;--prep:#ffd43b;--done:#69db7c;--accent:var(--work)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;-webkit-tap-highlight-color:transparent}
+main{max-width:520px;margin:0 auto;padding:14px 14px 40px}
+h1{font-size:20px;margin:4px 0 12px;letter-spacing:.02em}
+h1 small{color:var(--sub);font-weight:500;font-size:13px;margin-left:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.top{display:flex;align-items:center;gap:12px}
+.count{font-size:22px;font-weight:800;min-width:44px}
+.count small{font-size:14px;color:var(--sub);font-weight:600}
+.bar{flex:1;height:8px;background:#333b47;border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:6px}
+.sec{font-size:56px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;min-width:84px;text-align:right;color:var(--accent)}
+.phase{display:inline-block;margin-top:10px;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:700;background:var(--accent);color:#101318}
+.name{font-size:24px;font-weight:800;margin:6px 0 2px}
+.tip{color:var(--sub);font-size:15px;line-height:1.6;min-height:48px;margin:0}
+svg.fig{width:100%;height:auto;display:block;margin:6px 0 2px;background:#141921;border-radius:12px}
+.next{display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 10px;border:1px dashed var(--line);border-radius:12px;font-size:14px;color:var(--sub)}
+.next b{color:var(--text)}
+.next svg{width:90px;flex:none;background:#141921;border-radius:8px}
+.total{color:var(--sub);font-size:13px;margin-top:8px;text-align:right}
+.ctrl{display:flex;gap:10px;margin:14px 0}
+button{font:inherit;border:0;border-radius:14px;padding:16px 10px;font-size:18px;font-weight:800;cursor:pointer;color:#101318;background:var(--work)}
+button.main{flex:2}
+button.sub{flex:1;background:#2a313c;color:var(--text)}
+button:active{transform:scale(.98)}
+h2{font-size:16px;margin:22px 0 8px}
+ol.menu{list-style:none;margin:0;padding:0}
+ol.menu li{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:12px;border:1px solid transparent}
+ol.menu li.now{border-color:var(--work);background:#16232a}
+ol.menu li.fin{opacity:.5}
+ol.menu .no{flex:none;width:26px;height:26px;border-radius:50%;background:#2a313c;display:grid;place-items:center;font-weight:800;font-size:14px}
+ol.menu b{display:block;font-size:15px}
+ol.menu span{font-size:13px;color:var(--sub);line-height:1.5}
+details{margin-top:18px}
+summary{cursor:pointer;font-weight:700;padding:6px 0}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+.row select,.row input[type=checkbox]{font:inherit;font-size:16px;background:#2a313c;color:var(--text);border:0;border-radius:8px;padding:6px 8px}
+.row input[type=checkbox]{width:22px;height:22px}
+.note{font-size:12.5px;color:var(--sub);line-height:1.6;margin-top:14px}
+.done-msg{font-size:28px;font-weight:900;color:var(--done);text-align:center;margin:10px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>2分 腹筋ワークアウト<small>6種目 × 20秒</small></h1>
+
+<section class="card" id="stage">
+  <div class="top">
+    <div class="count" id="count">1<small>/6</small></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="sec" id="sec">20</div>
+  </div>
+  <span class="phase" id="phase">スタート待ち</span>
+  <div class="name" id="name"></div>
+  <svg class="fig" id="fig" viewBox="0 0 200 110"></svg>
+  <p class="tip" id="tip"></p>
+  <div class="next" id="nextBox"><svg id="nextFig" viewBox="0 0 200 110"></svg><div>NEXT<br><b id="nextName"></b></div></div>
+  <div class="total" id="total"></div>
+</section>
+
+<div class="ctrl">
+  <button class="main" id="btnStart">スタート</button>
+  <button class="sub" id="btnSkip">次へ</button>
+  <button class="sub" id="btnReset">リセット</button>
+</div>
+
+<h2>メニュー</h2>
+<ol class="menu" id="menu"></ol>
+
+<details>
+  <summary>設定</summary>
+  <div class="row">1種目の時間<select id="optWork"><option>15</option><option selected>20</option><option>30</option><option>40</option><option>45</option><option>60</option></select></div>
+  <div class="row">種目間の休憩<select id="optRest"><option value="0" selected>なし</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></div>
+  <div class="row">開始前の準備<select id="optPrep"><option>3</option><option selected>5</option><option>10</option></select></div>
+  <div class="row">セット数<select id="optSets"><option selected>1</option><option>2</option><option>3</option></select></div>
+  <div class="row">セット間の休憩<select id="optSetRest"><option>30</option><option selected>60</option><option>90</option></select></div>
+  <div class="row">音声ガイド<input type="checkbox" id="optVoice" checked></div>
+  <div class="row">ビープ音<input type="checkbox" id="optBeep" checked></div>
+  <p class="note">時間は秒です。設定はこのブラウザに保存されます。<br>腰に痛みが出たら中止してください。レッグレイズ系で腰が浮く場合は、膝を曲げるか脚を高めの位置で止めると負担が減ります。</p>
+</details>
+</main>
+
+<script>
+// ---- 種目データ（姿勢は横から見た棒人間。A⇔Bを往復） ----
+const L = (o)=>o;
+const lying = {head:[38,90],sh:[54,95],hip:[100,95]};
+const EX = [
+ {name:"プランク・ヒップアップ", tip:"ひじとつま先で体を支え、お尻を上げ下げする。下げたときに腰を反らさない。",
+  A:{head:[46,74],sh:[60,79],el:[60,99],ha:[82,99],hip:[110,81],kn:[140,89],ft:[170,99]},
+  B:{head:[50,78],sh:[62,82],el:[60,99],ha:[82,99],hip:[104,52],kn:[134,74],ft:[166,99]}, sp:1.3},
+ {name:"リバースクランチ", tip:"仰向けで脚を天井に向け、お尻を少し浮かせて足を真上へ突き上げる。反動を使わない。",
+  A:{...lying,el:[72,98],ha:[90,98],kn:[103,70],ft:[106,44]},
+  B:{head:[38,90],sh:[54,95],el:[72,98],ha:[90,98],hip:[96,82],kn:[94,56],ft:[92,28]}, sp:1.2},
+ {name:"バイシクルクランチ", tip:"手を頭の後ろに。自転車をこぐように膝を交互に胸へ引き寄せ、反対側のひじを近づける。",
+  A:{head:[42,76],sh:[56,86],el:[50,70],ha:[38,76],hip:[100,95],kn:[80,70],ft:[104,68],kn2:[130,90],ft2:[160,86]},
+  B:{head:[42,76],sh:[56,86],el:[50,70],ha:[38,76],hip:[100,95],kn:[130,90],ft:[160,86],kn2:[80,70],ft2:[104,68]}, sp:1.4},
+ {name:"レッグレイズ", tip:"仰向けで両脚をそろえて上げ下げ。腰が浮くなら膝を少し曲げてもOK。下げきらずに止める。",
+  A:{...lying,el:[72,98],ha:[90,98],kn:[103,70],ft:[106,44]},
+  B:{...lying,el:[72,98],ha:[90,98],kn:[130,90],ft:[160,86]}, sp:0.9},
+ {name:"ニーイン・ニーアウト", tip:"ひじをついて上体を起こし、膝を胸に引き寄せてから脚を伸ばす。足は床につけない。",
+  A:{head:[44,66],sh:[56,75],el:[62,97],ha:[80,99],hip:[100,95],kn:[84,70],ft:[110,78]},
+  B:{head:[44,66],sh:[56,75],el:[62,97],ha:[80,99],hip:[100,95],kn:[130,86],ft:[162,80]}, sp:1.2},
+ {name:"レッグホールド", tip:"ひじをついて上体を起こし、脚を伸ばして床から少し浮かせたままキープ。息は止めない。",
+  A:{head:[44,66],sh:[56,75],el:[62,97],ha:[80,99],hip:[100,95],kn:[130,86],ft:[162,80]},
+  B:{head:[44,67],sh:[56,76],el:[62,97],ha:[80,99],hip:[100,95],kn:[130,87],ft:[162,84]}, sp:1.5},
+];
+
+// ---- 棒人間描画 ----
+const NS="http://www.w3.org/2000/svg";
+function buildFig(svg){
+  svg.innerHTML="";
+  const floor=document.createElementNS(NS,"line");
+  Object.entries({x1:8,y1:101,x2:192,y2:101,stroke:"#3a4350","stroke-width":2}).forEach(([k,v])=>floor.setAttribute(k,v));
+  svg.appendChild(floor);
+  const mk=(tag,attrs)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);svg.appendChild(e);return e};
+  const st={stroke:"currentColor","stroke-width":5,"stroke-linecap":"round","stroke-linejoin":"round",fill:"none"};
+  return {
+    leg2:mk("polyline",{...st,opacity:.55}),
+    arm:mk("polyline",st), body:mk("line",st), leg:mk("polyline",st),
+    head:mk("circle",{r:8,fill:"currentColor"})
+  };
+}
+function lerp(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]}
+function drawFig(f,ex,t){
+  const P={}; for(const k in ex.A){P[k]=lerp(ex.A[k],ex.B[k]||ex.A[k],t)}
+  const s=p=>p.map(v=>v.toFixed(1)).join(",");
+  f.head.setAttribute("cx",P.head[0]);f.head.setAttribute("cy",P.head[1]);
+  f.body.setAttribute("x1",P.sh[0]);f.body.setAttribute("y1",P.sh[1]);f.body.setAttribute("x2",P.hip[0]);f.body.setAttribute("y2",P.hip[1]);
+  f.arm.setAttribute("points",[P.sh,P.el,P.ha].map(s).join(" "));
+  f.leg.setAttribute("points",[P.hip,P.kn,P.ft].map(s).join(" "));
+  f.leg2.setAttribute("points",P.kn2?[P.hip,P.kn2,P.ft2].map(s).join(" "):"");
+}
+
+// ---- 設定 ----
+const $=id=>document.getElementById(id);
+const optIds=["optWork","optRest","optPrep","optSets","optSetRest","optVoice","optBeep"];
+function loadOpts(){try{const o=JSON.parse(localStorage.getItem("abs2min")||"{}");optIds.forEach(id=>{if(o[id]!==undefined){const el=$(id);el.type==="checkbox"?el.checked=o[id]:el.value=o[id]}})}catch(e){}}
+function saveOpts(){try{const o={};optIds.forEach(id=>{const el=$(id);o[id]=el.type==="checkbox"?el.checked:el.value});localStorage.setItem("abs2min",JSON.stringify(o))}catch(e){}}
+const opt=()=>({work:+$("optWork").value,rest:+$("optRest").value,prep:+$("optPrep").value,sets:+$("optSets").value,setRest:+$("optSetRest").value,voice:$("optVoice").checked,beep:$("optBeep").checked});
+
+// ---- フェーズ構築 ----
+let phases=[],idx=0,running=false,endAt=0,remain=0,finished=false;
+function build(){
+  const o=opt(); phases=[{type:"prep",dur:o.prep,ex:0,set:1}];
+  for(let s=1;s<=o.sets;s++){
+    EX.forEach((e,i)=>{
+      phases.push({type:"work",dur:o.work,ex:i,set:s});
+      const last=i===EX.length-1;
+      if(!last&&o.rest>0)phases.push({type:"rest",dur:o.rest,ex:i+1,set:s});
+      if(last&&s<o.sets)phases.push({type:"rest",dur:o.setRest,ex:0,set:s+1,setBreak:true});
+    });
+  }
+  idx=0;remain=phases[0].dur;finished=false;running=false;
+  const total=phases.reduce((a,p)=>a+p.dur,0)-o.prep;
+  $("total").textContent=`合計 約${Math.floor(total/60)}分${total%60?total%60+"秒":""}（${o.sets}セット）`;
+  render(true);
+}
+
+// ---- 音 ----
+let ac=null;
+function beep(freq=880,len=.12,vol=.25){
+  if(!opt().beep)return;
+  try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=freq;o.type="sine";
+    g.gain.setValueAtTime(vol,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+len);
+    o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+len)}catch(e){}
+}
+function say(text){
+  if(!opt().voice||!("speechSynthesis" in window))return;
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="ja-JP";u.rate=1.05;speechSynthesis.speak(u)}catch(e){}
+}
+let wake=null;
+async function keepAwake(on){try{if(on&&"wakeLock" in navigator){wake=await navigator.wakeLock.request("screen")}else if(wake){await wake.release();wake=null}}catch(e){}}
+
+// ---- 進行 ----
+function announce(){
+  const p=phases[idx],o=opt(),ex=EX[p.ex];
+  if(p.type==="prep")say(`準備してください。最初は${ex.name}`);
+  else if(p.type==="work")say(o.sets>1&&p.ex===0?`${p.set}セット目。${ex.name}、スタート`:`${ex.name}、スタート`);
+  else say(p.setBreak?`休憩。次は${p.set}セット目`:`休憩。次は${ex.name}`);
+}
+function nextPhase(){
+  idx++;
+  if(idx>=phases.length){finish();return}
+  remain=phases[idx].dur;endAt=performance.now()+remain*1000;
+  beep(phases[idx].type==="work"?1320:660,.35,.3);
+  announce();render(true);
+}
+function finish(){
+  running=false;finished=true;idx=phases.length-1;remain=0;
+  beep(1320,.2);setTimeout(()=>beep(1760,.4),220);
+  say("お疲れさまでした");keepAwake(false);render(true);
+}
+let lastShown=-1;
+function tick(now){
+  if(running){
+    const left=Math.max(0,(endAt-now)/1000);
+    remain=left;
+    const s=Math.ceil(left);
+    if(s!==lastShown){lastShown=s;if(s<=3&&s>0)beep(880,.12)}
+    if(left<=0)nextPhase();
+    render(false);
+  }
+  animate(now);
+  requestAnimationFrame(tick);
+}
+
+// ---- 表示 ----
+const fig=buildFig($("fig")),nfig=buildFig($("nextFig"));
+function curEx(){return EX[phases[idx]?.ex??0]}
+function animate(now){
+  const p=phases[idx];const ex=curEx();
+  const moving=running&&p&&p.type==="work";
+  const t=moving?(1-Math.cos(now/1000*Math.PI*ex.sp))/2:0;
+  drawFig(fig,ex,t);
+}
+function render(full){
+  const p=phases[idx];if(!p)return;
+  const ex=EX[p.ex],o=opt();
+  const color=finished?"var(--done)":p.type==="work"?"var(--work)":p.type==="rest"?"var(--rest)":"var(--prep)";
+  document.documentElement.style.setProperty("--accent",color);
+  const s=Math.ceil(remain);
+  $("sec").textContent=String(s).padStart(2,"0");
+  $("bar").style.width=(finished?100:(1-remain/p.dur)*100)+"%";
+  if(!full)return;
+  $("count").innerHTML=`${p.ex+1}<small>/${EX.length}</small>`;
+  $("phase").textContent=finished?"完了":!running&&idx===0&&remain===p.dur?"スタート待ち":!running?"一時停止":p.type==="work"?(o.sets>1?`${p.set}セット目`:"運動中"):p.type==="rest"?"休憩":"準備";
+  $("name").textContent=finished?"お疲れさまでした！":ex.name;
+  $("tip").textContent=finished?"もう一度やるときは「もう一度」を押してください。":ex.tip;
+  // NEXT
+  // 準備・休憩中は画面の種目が「これから行う種目」なので、その次をNEXTに出す
+  let skip=p.type==="work"?0:1,nx=null;
+  for(let j=idx+1;j<phases.length;j++){if(phases[j].type==="work"){if(skip){skip--;continue}nx=phases[j];break}}
+  if(finished||!nx){$("nextBox").style.display="none"}else{$("nextBox").style.display="flex";$("nextName").textContent=EX[nx.ex].name;drawFig(nfig,EX[nx.ex],.5)}
+  $("btnStart").textContent=finished?"もう一度":running?"一時停止":(idx===0&&remain===p.dur?"スタート":"再開");
+  // menu
+  [...$("menu").children].forEach((li,i)=>{
+    li.className=finished?"fin":(p.type==="work"&&i===p.ex?"now":(i<p.ex||(p.type!=="work"&&i<p.ex))?"fin":"");
+  });
+}
+function menuInit(){
+  $("menu").innerHTML=EX.map((e,i)=>`<li><div class="no">${i+1}</div><div><b>${e.name}</b><span>${e.tip}</span></div></li>`).join("");
+}
+
+// ---- ボタン ----
+$("btnStart").onclick=()=>{
+  try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}
+  if(finished){build()}
+  if(running){running=false;remain=Math.max(0,(endAt-performance.now())/1000);keepAwake(false);speechSynthesis&&speechSynthesis.cancel();render(true);return}
+  const fresh=idx===0&&remain===phases[0].dur;
+  running=true;endAt=performance.now()+remain*1000;lastShown=-1;keepAwake(true);
+  if(fresh)announce();
+  render(true);
+};
+$("btnSkip").onclick=()=>{if(finished)return;if(!running){idx++;if(idx>=phases.length){finish();return}remain=phases[idx].dur;render(true)}else{endAt=performance.now()}};
+$("btnReset").onclick=()=>{running=false;keepAwake(false);try{speechSynthesis.cancel()}catch(e){}build()};
+optIds.forEach(id=>$(id).addEventListener("change",()=>{saveOpts();if(!running)build();else{const t=$("total");}}));
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&running)keepAwake(true)});
+
+loadOpts();menuInit();build();requestAnimationFrame(tick);
+</script>
+</body>
+</html>
