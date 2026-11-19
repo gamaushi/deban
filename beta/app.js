@@ -597,8 +597,8 @@ function dayDialog(d) {
         if (!memoChanged()) { if (fromBack) { dialogBack = null; close(); } else done(); return; }
         if (fromBack) { history.pushState(Object.assign({}, history.state, { dlg: 1 }), '', location.href); dialogBack = () => cancel(true); }
         openDialog({
-          title: 'メモの変更を捨てますか？', body: '<div>書き換えたメモは保存されません。</div>',
-          buttons: [{ label: '戻る' }, { label: '捨てる', cls: 'danger', onClick: () => { done(); } }]
+          title: 'メモを保存せずに閉じますか？', body: '<div>書き換えたメモは元に戻ります。</div>',
+          buttons: [{ label: '編集を続ける' }, { label: '保存せずに閉じる', cls: 'ghost danger', onClick: () => { done(); } }]
         });
       };
       ov.addEventListener('click', e => { if (e.target === ov) cancel(false); });
