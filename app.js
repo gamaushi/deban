@@ -290,8 +290,9 @@ function summaryHtml(s, p) {
   }
   if (s.remainingToClear <= 0) { const over = -s.remainingToClear; r2.push(it('責任出番：クリア' + (s.dailyNight && over > 0 ? `（+${over}）` : ''), 'c-green b')); }
   else r2.push(it(`クリアまで：${s.remainingToClear}${s.dailyNight ? '回' : '出番'}`, 'c-amber b'));
-  if (!s.hasHireDate) r2.push(it('有給残：--', 'c-gray'));
-  else r2.push(it(`有給残：${s.paidRemaining ? s.paidRemaining.shifts : 0}出番`, 'c-orange b'));
+  // 有給残はタップすると有給取得のリストを出す
+  if (!s.hasHireDate) r2.push(`<button class="paidlink c-gray" data-paid="${s.ym}">有給残：-- ▸</button>`);
+  else r2.push(`<button class="paidlink c-orange b" data-paid="${s.ym}">有給残：${s.paidRemaining ? s.paidRemaining.shifts : 0}出番 ▸</button>`);
   if (s.dailyNight && s.shortage > 0) r2.push(it(`⚠ 予定が${s.shortage}回不足`, 'c-alert b'));
   const r3 = [];
   if (!s.dailyNight || s.extraCount > 0) { r3.push(it(`出番：${yen(s.baseRevenue)}円`)); r3.push(it(`公出：${yen(s.extraRevenue)}円`)); }
@@ -331,6 +332,66 @@ function buildRange(center) {
   for (let ym = rangeStart; ym <= rangeEnd; ym++) monthsEl.appendChild(makeSection(ym));
 }
 function sectionOf(ym) { return monthsEl.querySelector(`section[data-ym="${ym}"]`); }
+// ===== 有給取得のリスト（有給残をタップ）=====
+/** 有給の日を付与期間ごとにまとめて表示。日付を押すとカレンダーのその日へ移動する */
+function showPaidList(ym) {
+  const L = ledger(), p = pattern(), hire = data.hireDate, today = todayIso();
+  const entries = Object.keys(L.store).filter(d => Values.isPaid(L.store[d])).sort().reverse()
+    .map(d => ({ d, consumed: L.isConsumed(d) }));
+  const asOf = Shift.periodEnd(ym);
+  const rem = L.paidRemaining(asOf);
+  const dps = L.dps;
+  const fmtD = d => `${dYear(d)}/${dMonth(d)}/${dDay(d)}(${WEEK[dow(d)]})`;
+  const row = x => `<button class="plrow" data-go="${x.d}"><span>${fmtD(x.d)}</span>` +
+    (x.consumed ? '<span class="pltag gray">公出消（有給残は減らない）</span>' : '<span class="pltag">有給</span>') +
+    (x.d > today ? '<span class="pltag blue">予定</span>' : '') + '</button>';
+  let body = `<div style="font-size:14px">${esc(Shift.PATTERN_LABELS[p])}　` +
+    (rem ? `<b class="c-orange">有給残：${rem.shifts}出番</b>（${rem.days}日）<span style="color:#666">　${ymJp(ym)}分の締め日（${dMonth(asOf)}/${dDay(asOf)}）時点</span>` : '<span style="color:#666">入社年月日が未入力のため、有給残は計算できません（取得日だけ表示します）。</span>') + '</div>';
+  if (!entries.length) body += '<div style="padding:12px 0;color:#666">有給の記録はありません。</div>';
+  else if (!hire) body += `<div class="plgrp">${entries.map(row).join('')}</div>`;
+  else {
+    // 付与日ごとに区切る（付与日〜次の付与日の前日）
+    const last = entries[0].d > today ? entries[0].d : today;
+    const gs = PaidLeave.grants(hire, addDays(last, 400));
+    const marks = L.allGrantMarks;
+    const groups = [];
+    gs.forEach((g, i) => {
+      const end = i + 1 < gs.length ? addDays(gs[i + 1].date, -1) : null;
+      const list = entries.filter(x => x.d >= g.date && (end === null || x.d <= end));
+      if (g.date > last && !list.length) return;
+      groups.push({ g, end, list });
+    });
+    const before = entries.filter(x => !gs.length || x.d < gs[0].date);
+    groups.reverse();
+    body += groups.map((gr, i) => {
+      const used = gr.list.filter(x => !x.consumed).length, cons = gr.list.length - used;
+      const m = marks.get(gr.g.date);
+      const head = `${dYear(gr.g.date)}/${dMonth(gr.g.date)}/${dDay(gr.g.date)}〜${gr.end ? `${dYear(gr.end)}/${dMonth(gr.end)}/${dDay(gr.end)}` : ''}`;
+      const sub = `${gr.g.days}日付与${m ? `（付与後の有給残 ${m.remainingShifts}出番）` : ''}　使った有給：${used}出番（${used * dps}日）${cons ? `　公出消：${cons}回` : ''}`;
+      return `<details class="plgrp"${i < 2 ? ' open' : ''}><summary><b>${head}</b><br><span style="font-size:12px;color:#555">${sub}</span></summary>` +
+        (gr.list.length ? gr.list.map(row).join('') : '<div style="padding:6px 4px;color:#888;font-size:13px">この期間の有給はありません</div>') + '</details>';
+    }).join('');
+    if (before.length) body += `<details class="plgrp"><summary><b>最初の付与より前</b></summary>${before.map(row).join('')}</details>`;
+  }
+  body += '<div style="font-size:12px;color:#666">日付を押すと、カレンダーのその日に移動します。</div>';
+  openDialog({
+    title: '📋 有給取得のリスト', body,
+    onMount: (ov, close) => ov.addEventListener('click', e => {
+      const b = e.target.closest('[data-go]'); if (!b) return;
+      close(); jumpToDate(b.dataset.go);
+    }),
+    buttons: [{ label: '閉じる' }]
+  });
+}
+/** カレンダーのその日へ移動して、少しの間光らせる */
+function jumpToDate(d) {
+  scrollToMonth(ymOf(d), true);
+  setTimeout(() => {
+    const c = monthsEl.querySelector(`[data-d="${d}"]`); if (!c) return;
+    c.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 2000);
+  }, 350);
+}
 function scrollToMonth(ym, smooth) {
   if (ym < rangeStart || ym > rangeEnd) buildRange(ym);
   const s = sectionOf(ym);
@@ -429,6 +490,8 @@ $('#modeSw').addEventListener('click', e => {
 $('#title').addEventListener('click', () => monthPicker(topMonth()));
 $('#gear').addEventListener('click', () => go('setting'));
 monthsEl.addEventListener('click', e => {
+  const pl = e.target.closest('[data-paid]');
+  if (pl) { showPaidList(+pl.dataset.paid); return; }
   const rv = e.target.closest('[data-rv]');
   if (rv) { startRevenueImport(+rv.dataset.rv); return; }
   const sal = e.target.closest('[data-sal]');
