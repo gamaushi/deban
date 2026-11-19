@@ -497,6 +497,7 @@ const Store = {
   toJson(d) {
     return {
       sales: Store.sortObj(d.sales), dailyNightSales: Store.sortObj(d.dailyNight), hireDate: d.hireDate || '',
+      memos: Store.sortObj(d.memos || {}),   // 日ごとのメモ（班・勤務に関係なく日付で1つ）
       settings: {
         pattern: d.settings.pattern, hann: d.settings.hann,
         pensionHistory: Store.pensionToJson(d.settings.pensionHistory),
@@ -523,7 +524,8 @@ const Store = {
       meeting: typeof s.meeting === 'boolean' ? s.meeting : def.meeting,
       nikkin: typeof s.nikkin === 'boolean' ? s.nikkin : def.nikkin
     };
-    return { sales: Store.mapFromJson(o && o.sales), dailyNight: Store.mapFromJson(o && o.dailyNightSales), hireDate: parseDate(o && o.hireDate), settings };
+    const memos = Store.mapFromJson(o && o.memos); for (const k of Object.keys(memos)) if (!memos[k].trim()) delete memos[k];
+    return { sales: Store.mapFromJson(o && o.sales), dailyNight: Store.mapFromJson(o && o.dailyNightSales), hireDate: parseDate(o && o.hireDate), memos, settings };
   }
 };
 
@@ -542,6 +544,7 @@ const Backup = {
       appPensionHistory: Store.pensionToJson(data.settings.pensionHistory),
       stores: {
         sales: arr(data.sales, true), dailyNightSales: arr(data.dailyNight, false),
+        memos: arr(data.memos || {}, false),
         employeeInfo: data.hireDate ? [{ key: 'hireDate', value: data.hireDate }] : []
       }
     }, null, 2);
@@ -579,6 +582,7 @@ const Backup = {
       settings: Object.assign({}, current.settings, { pensionHistory: pension }),
       sales: merge(current.sales, stores.sales, false),
       dailyNight: merge(current.dailyNight, stores.dailyNightSales, true),
+      memos: merge(current.memos || {}, stores.memos, false),
       hireDate: hire
     });
     return { data, written, skipped };

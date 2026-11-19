@@ -264,7 +264,8 @@ function cellHtml(d, led, red, marks, today, simple) {
     (wxIcon ? `<span class="wx${closing ? ' sm' : ''}">${wxIcon}</span>` : '') + '</div>';
   if (simple) return h + '</div>';   // 金額・有給・欠勤などの文字は出さない
   const vbg = dn ? 'rgba(255,255,255,.13)' : (valueColor(value, false) || '#fff');
-  h += `<div class="drv">${Shift.workingDrivers(d)}</div><div class="duty">${Shift.dutyOfficer(d)}</div>` +
+  const memo = (data.memos || {})[d];
+  h += `<div class="drv">${Shift.workingDrivers(d)}</div><div class="duty">${Shift.dutyOfficer(d)}${memo ? '<span class="mm" title="メモあり">㋱</span>' : ''}</div>` +
     `<div class="val${Values.isRevenue(value) ? ' rev' : ''}" style="background:${vbg}">${esc(shortValue(value))}</div></div>`;
   return h;
 }
@@ -363,7 +364,7 @@ function showPaidList(ym) {
       groups.push({ g, end, list });
     });
     const before = entries.filter(x => !gs.length || x.d < gs[0].date).reverse();
-    groups.reverse();
+    if (before.length) body += `<details class="plgrp"><summary><b>最初の付与より前</b></summary>${before.map(row).join('')}</details>`;
     body += groups.map((gr, i) => {
       const used = gr.list.filter(x => !x.consumed).length, cons = gr.list.length - used;
       const m = marks.get(gr.g.date);
@@ -373,18 +374,22 @@ function showPaidList(ym) {
       const line1 = `${gr.g.days}日付与${carry === null ? '' : carry > 0 ? `＋繰越${carry}日` : '・繰越なし'}${m ? `（付与後の有給残 ${m.remainingShifts}出番）` : ''}`;
       const plan = gr.list.filter(x => !x.consumed && x.d > today).length;
       const line2 = `使った有給：${used * dps}日（${used}出番${plan ? `・うち予定${plan}回` : ''}）${cons ? `　公出消：${cons}回` : ''}`;
-      return `<details class="plgrp"${i < 2 ? ' open' : ''}><summary><b>${head}</b><br><span style="font-size:12px;color:#555">${line1}<br>${line2}</span></summary>` +
+      return `<details class="plgrp"${i >= groups.length - 2 ? ' open' : ''}${i === groups.length - 1 ? ' id="plNow"' : ''}><summary><b>${head}</b><br><span style="font-size:12px;color:#555">${line1}<br>${line2}</span></summary>` +
         (gr.list.length ? gr.list.map(row).join('') : '<div style="padding:6px 4px;color:#888;font-size:13px">この期間の有給はありません</div>') + '</details>';
     }).join('');
-    if (before.length) body += `<details class="plgrp"><summary><b>最初の付与より前</b></summary>${before.map(row).join('')}</details>`;
   }
   body += '<div style="font-size:12px;color:#666">日付を押すと、カレンダーのその日に移動します。</div>';
   openDialog({
     title: '📋 有給取得のリスト', body,
-    onMount: (ov, close) => ov.addEventListener('click', e => {
-      const b = e.target.closest('[data-go]'); if (!b) return;
-      close(); jumpToDate(b.dataset.go);
-    }),
+    onMount: (ov, close) => {
+      // 古い順に並ぶので、開いた時は一番下の今の期間の見出しまで送っておく
+      const now = ov.querySelector('#plNow'), db = ov.querySelector('.db');
+      if (now) db.scrollTop = now.offsetTop - db.offsetTop - 8;
+      ov.addEventListener('click', e => {
+        const b = e.target.closest('[data-go]'); if (!b) return;
+        close(); jumpToDate(b.dataset.go);
+      });
+    },
     buttons: [{ label: '閉じる' }]
   });
 }
@@ -532,6 +537,13 @@ function monthPicker(initial) {
 }
 
 // ===== 日付の入力ダイアログ =====
+/** その日のメモを保存（空なら消す）。render=true で画面を描き直す */
+function saveMemo(d, text, render) {
+  const t = String(text || '').trim(), m = Object.assign({}, data.memos || {});
+  if ((m[d] || '') === t) { if (render) refreshAll(); return; }
+  if (t) m[d] = t; else delete m[d];
+  update(Object.assign({}, data, { memos: m }), { noRender: !render });
+}
 function dayDialog(d) {
   const led = ledger(), p = led.pattern, dn = p === DAILY_NIGHT;
   const current = led.displayValue(d);
@@ -559,15 +571,21 @@ function dayDialog(d) {
     `<div class="field" style="margin-top:6px"><label for="rev">営収（円）</label><div class="inwrap">` +
     `<input id="rev" class="inp" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" placeholder="例：45270" value="${init.length <= Values.MAX_DIGITS ? init : ''}">` +
     `<button class="clr" id="clr" aria-label="入力を消す" ${init ? '' : 'hidden'}>✕</button></div><div class="errtxt" id="err"></div></div>` +
-    `<div class="wbtns">${words.map(x => `<button data-w="${x}"${noPaid && x === '有給' ? ' disabled aria-label="有給（土日祝は取得できません）"' : ''}>${x}</button>`).join('')}</div>`;
+    `<div class="wbtns">${words.map(x => `<button data-w="${x}"${noPaid && x === '有給' ? ' disabled aria-label="有給（土日祝は取得できません）"' : ''}>${x}</button>`).join('')}</div>` +
+    `<div class="field"><label for="memo">㋱ メモ</label><textarea id="memo" class="inp memo" rows="2" maxlength="300" placeholder="例：〇〇さんと出番交換、点検日 など">${esc((data.memos || {})[d] || '')}</textarea></div>`;
   openDialog({
     title: `${dMonth(d)}月${dDay(d)}日（${WEEK[dow(d)]}）` + (hn ? `<div class="hn">${esc(hn)}</div>` : ''),
     body,
-    buttons: [{ label: '閉じる' }, { label: '営収を保存', cls: '', id: 'saveRev', onClick: () => false }],
+    buttons: [{ label: '閉じる', onClick: () => { saveMemo(d, document.querySelector('#memo').value, true); } }, { label: '営収を保存', cls: '', id: 'saveRev', onClick: () => false }],
     onMount: (ov, close) => {
       const inp = ov.querySelector('#rev'), err = ov.querySelector('#err'), clr = ov.querySelector('#clr');
+      // メモは入力のたびに保存（画面の描き直しは閉じる時だけ）
+      const memoEl = ov.querySelector('#memo'); let memoTimer = 0;
+      memoEl.addEventListener('input', () => { clearTimeout(memoTimer); memoTimer = setTimeout(() => saveMemo(d, memoEl.value, false), 400); });
+      ov.addEventListener('click', e => { if (e.target === ov) { clearTimeout(memoTimer); saveMemo(d, memoEl.value, true); } }, true);
       const setErr = m => { err.textContent = m || ''; inp.classList.toggle('err', !!m); };
       const send = raw => {
+        clearTimeout(memoTimer); saveMemo(d, memoEl.value, false);
         const r = submit(d, raw);
         if (!r.ok && r.msg && r.msg.startsWith('営収は')) { setErr(r.msg); return; }
         if (r.msg) toast(r.msg);
