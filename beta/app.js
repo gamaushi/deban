@@ -346,8 +346,9 @@ function showPaidList(ym) {
   const row = x => `<button class="plrow" data-go="${x.d}"><span>${fmtD(x.d)}</span>` +
     (x.consumed ? '<span class="pltag gray">公出消（残は減らない）</span>' : '<span class="pltag">有給</span>') +
     (x.d > today ? '<span class="pltag blue">予定</span>' : '') + '</button>';
-  let body = `<div style="font-size:14px">${esc(Shift.PATTERN_LABELS[p])}　` +
+  const headInfo = `<div class="plhead">${esc(Shift.PATTERN_LABELS[p])}　` +
     (rem ? `<b class="c-orange">有給残：${rem.shifts}出番</b>（${rem.days}日）<span style="color:#666">　${ymJp(ym)}分の締め日（${dMonth(asOf)}/${dDay(asOf)}）時点</span>` : '<span style="color:#666">入社年月日が未入力のため、有給残は計算できません（取得日だけ表示します）。</span>') + '</div>';
+  let body = '';
   if (!entries.length) body += '<div style="padding:12px 0;color:#666">有給の記録はありません。</div>';
   else if (!hire) body += `<div class="plgrp">${entries.slice().reverse().map(row).join('')}</div>`;
   else {
@@ -380,11 +381,12 @@ function showPaidList(ym) {
   }
   body += '<div style="font-size:12px;color:#666">日付を押すと、カレンダーのその日に移動します。</div>';
   openDialog({
-    title: '📋 有給取得のリスト', body,
+    title: '📋 有給取得のリスト' + headInfo, body,
     onMount: (ov, close) => {
       // 古い順に並ぶので、開いた時は一番下の今の期間の見出しまで送っておく
       const now = ov.querySelector('#plNow'), db = ov.querySelector('.db');
-      if (now) db.scrollTop = now.offsetTop - db.offsetTop - 8;
+      const toNow = () => { if (now) db.scrollTop += now.getBoundingClientRect().top - db.getBoundingClientRect().top - 4; };
+      toNow(); requestAnimationFrame(toNow); setTimeout(toNow, 120);   // 表示が落ち着いてからもう一度
       ov.addEventListener('click', e => {
         const b = e.target.closest('[data-go]'); if (!b) return;
         close(); jumpToDate(b.dataset.go);
@@ -572,7 +574,7 @@ function dayDialog(d) {
     `<input id="rev" class="inp" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" placeholder="例：45270" value="${init.length <= Values.MAX_DIGITS ? init : ''}">` +
     `<button class="clr" id="clr" aria-label="入力を消す" ${init ? '' : 'hidden'}>✕</button></div><div class="errtxt" id="err"></div></div>` +
     `<div class="wbtns">${words.map(x => `<button data-w="${x}"${noPaid && x === '有給' ? ' disabled aria-label="有給（土日祝は取得できません）"' : ''}>${x}</button>`).join('')}</div>` +
-    `<div class="field"><label for="memo">㋱ メモ</label><textarea id="memo" class="inp memo" rows="2" maxlength="300" placeholder="例：〇〇さんと出番交換、点検日 など">${esc((data.memos || {})[d] || '')}</textarea></div>`;
+    `<div class="field"><textarea id="memo" class="inp memo" rows="2" maxlength="300" placeholder="メモ" aria-label="メモ">${esc((data.memos || {})[d] || '')}</textarea></div>`;
   openDialog({
     title: `${dMonth(d)}月${dDay(d)}日（${WEEK[dow(d)]}）` + (hn ? `<div class="hn">${esc(hn)}</div>` : ''),
     body,
