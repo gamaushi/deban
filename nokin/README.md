@@ -1,4 +1,4 @@
-# 納金電卓（Web版 v5.1）
+# 納金電卓（Web版 v5.6）
 
 iPhone・Androidのブラウザで動く版です。サーバー（Perl等）は不要で、GitHub Pagesに置くだけで使えます。
 

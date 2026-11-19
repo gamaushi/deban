@@ -220,7 +220,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 </script>
 <script>
 'use strict';
-const VERSION = 'v5.5 (Web版)';
+const VERSION = 'v5.6 (Web版)';
 
 /* ============================================================
    項目の定義（日報に表示される順番）
@@ -448,8 +448,12 @@ function enterCalc(){
 }
 
 // キーは押した瞬間に反応させる（iPhoneのタップ遅延・ダブルタップ拡大を避ける）
+// ただしENTERだけは指を離した時(click)に反応させる。押した瞬間に電卓を閉じると、
+// 指を離した時のタップが下にある項目に届いて、別の項目の電卓が開いてしまうため
 document.querySelectorAll('.k').forEach(b => {
-  b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('down'); calcKey(b.dataset.k); });
+  const isEnter = b.dataset.k === 'ENTER';
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('down'); if (!isEnter) calcKey(b.dataset.k); });
+  if (isEnter) b.addEventListener('click', () => calcKey('ENTER'));
   const up = () => b.classList.remove('down');
   b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
 });
