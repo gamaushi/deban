@@ -10,7 +10,7 @@ const ymJp = ym => `${ymY(ym)}年${ymM(ym)}月`;
 // ===== 保存（端末内 localStorage。Android版と同じJSON形式） =====
 // 試験版（/deban/beta/）は本物と別の場所に保存する。初めて開いた時だけ本物のデータをコピーする
 const BETA = /\/beta\//.test(location.pathname);
-const LS_DATA = BETA ? 'deban_data_beta' : 'deban_data';
+const LS_DATA = BETA ? 'deban_data_beta_paid' : 'deban_data';
 if (BETA && lsGet(LS_DATA) === null && lsGet('deban_data') !== null) lsSet(LS_DATA, lsGet('deban_data'));
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
