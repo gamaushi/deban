@@ -343,7 +343,7 @@ function showPaidList(ym) {
   const dps = L.dps;
   const fmtD = d => `${dYear(d)}/${dMonth(d)}/${dDay(d)}(${WEEK[dow(d)]})`;
   const row = x => `<button class="plrow" data-go="${x.d}"><span>${fmtD(x.d)}</span>` +
-    (x.consumed ? '<span class="pltag gray">公出消（有給残は減らない）</span>' : '<span class="pltag">有給</span>') +
+    (x.consumed ? '<span class="pltag gray">公出消（残は減らない）</span>' : '<span class="pltag">有給</span>') +
     (x.d > today ? '<span class="pltag blue">予定</span>' : '') + '</button>';
   let body = `<div style="font-size:14px">${esc(Shift.PATTERN_LABELS[p])}　` +
     (rem ? `<b class="c-orange">有給残：${rem.shifts}出番</b>（${rem.days}日）<span style="color:#666">　${ymJp(ym)}分の締め日（${dMonth(asOf)}/${dDay(asOf)}）時点</span>` : '<span style="color:#666">入社年月日が未入力のため、有給残は計算できません（取得日だけ表示します）。</span>') + '</div>';
@@ -367,8 +367,12 @@ function showPaidList(ym) {
       const used = gr.list.filter(x => !x.consumed).length, cons = gr.list.length - used;
       const m = marks.get(gr.g.date);
       const head = `${dYear(gr.g.date)}/${dMonth(gr.g.date)}/${dDay(gr.g.date)}〜${gr.end ? `${dYear(gr.end)}/${dMonth(gr.end)}/${dDay(gr.end)}` : ''}`;
-      const sub = `${gr.g.days}日付与${m ? `（付与後の有給残 ${m.remainingShifts}出番）` : ''}　使った有給：${used}出番（${used * dps}日）${cons ? `　公出消：${cons}回` : ''}`;
-      return `<details class="plgrp"${i < 2 ? ' open' : ''}><summary><b>${head}</b><br><span style="font-size:12px;color:#555">${sub}</span></summary>` +
+      // 繰越＝付与した直後の合計から今回の付与分を引いた日数（前の年から持ち越した分）
+      const carry = m ? Math.max(0, m.cumulative - Math.min(gr.g.days, PaidLeave.MAX_GRANT)) : null;
+      const line1 = `${gr.g.days}日付与${carry === null ? '' : carry > 0 ? `＋繰越${carry}日` : '・繰越なし'}${m ? `（付与後の有給残 ${m.remainingShifts}出番）` : ''}`;
+      const plan = gr.list.filter(x => !x.consumed && x.d > today).length;
+      const line2 = `使った有給：${used * dps}日（${used}出番${plan ? `・うち予定${plan}回` : ''}）${cons ? `　公出消：${cons}回` : ''}`;
+      return `<details class="plgrp"${i < 2 ? ' open' : ''}><summary><b>${head}</b><br><span style="font-size:12px;color:#555">${line1}<br>${line2}</span></summary>` +
         (gr.list.length ? gr.list.map(row).join('') : '<div style="padding:6px 4px;color:#888;font-size:13px">この期間の有給はありません</div>') + '</details>';
     }).join('');
     if (before.length) body += `<details class="plgrp"><summary><b>最初の付与より前</b></summary>${before.map(row).join('')}</details>`;
