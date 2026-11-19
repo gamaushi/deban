@@ -578,7 +578,7 @@ function dayDialog(d) {
   openDialog({
     title: `${dMonth(d)}月${dDay(d)}日（${WEEK[dow(d)]}）` + (hn ? `<div class="hn">${esc(hn)}</div>` : ''),
     body,
-    buttons: [{ label: '閉じる', onClick: () => { saveMemo(d, document.querySelector('#memo').value, true); } }, { label: '営収を保存', cls: '', id: 'saveRev', onClick: () => false }],
+    buttons: [{ label: '閉じる', onClick: () => { saveMemo(d, document.querySelector('#memo').value, true); } }, { label: '保存', cls: '', id: 'saveRev', onClick: () => false }],
     onMount: (ov, close) => {
       const inp = ov.querySelector('#rev'), err = ov.querySelector('#err'), clr = ov.querySelector('#clr');
       // メモは入力のたびに保存（画面の描き直しは閉じる時だけ）
@@ -602,8 +602,10 @@ function dayDialog(d) {
       clr.addEventListener('click', () => { inp.value = ''; clr.hidden = true; setErr(''); inp.focus(); });
       inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) send(inp.value); });
       ov.querySelector('.wbtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) send(b.dataset.w === 'クリア' ? '' : b.dataset.w); });
+      // 「保存」：営収が入っていれば営収とメモ、空ならメモだけ保存して閉じる
       ov.querySelector('#saveRev').addEventListener('click', () => {
-        if (!inp.value.trim()) setErr('営収を入力するか、上のボタンを選んでください'); else send(inp.value);
+        if (inp.value.trim()) { send(inp.value); return; }
+        clearTimeout(memoTimer); saveMemo(d, memoEl.value, true); close();
       });
     }
   });
