@@ -260,12 +260,13 @@ function cellHtml(d, led, red, marks, today, simple) {
   const dnCls = ['dn', closing ? 'cl' : '', hol ? 'hol' : '', d === today ? 'td' : '', w === 0 ? 'su' : '', w === 6 ? 'sa' : ''].join(' ');
   const wx = Weather.data[d]; const wxIcon = wx ? Weather.icon(wx.code) : '';
   let h = `<div class="cell day${red.has(d) && !simple ? ' red' : ''}" data-d="${d}" style="background:${bg}">` +
-    `<div class="r1"><span class="${dnCls}">${closing ? '&lt;18&gt;' : dDay(d)}</span>${marks.has(d) && !simple ? '<span class="gm">㊒</span>' : ''}<span class="sp"></span>` +
+    `<div class="r1"><span class="${dnCls}">${closing ? '&lt;18&gt;' : dDay(d)}</span><span class="sp"></span>` +
     (wxIcon ? `<span class="wx${closing ? ' sm' : ''}">${wxIcon}</span>` : '') + '</div>';
   if (simple) return h + '</div>';   // 金額・有給・欠勤などの文字は出さない
   const vbg = dn ? 'rgba(255,255,255,.13)' : (valueColor(value, false) || '#fff');
   const memo = (data.memos || {})[d];
-  h += `<div class="drv">${Shift.workingDrivers(d)}</div><div class="duty">${Shift.dutyOfficer(d)}${memo ? '<span class="mm" title="メモあり">㋱</span>' : ''}</div>` +
+  // ㊒（有給付与日）は乗務の班の後ろに付ける
+  h += `<div class="drv">${Shift.workingDrivers(d)}${marks.has(d) ? '<span class="gm">㊒</span>' : ''}</div><div class="duty">${Shift.dutyOfficer(d)}${memo ? '<span class="mm" title="メモあり">㋱</span>' : ''}</div>` +
     `<div class="val${Values.isRevenue(value) ? ' rev' : ''}" style="background:${vbg}">${esc(shortValue(value))}</div></div>`;
   return h;
 }
