@@ -348,7 +348,7 @@ function showPaidList(ym) {
   let body = `<div style="font-size:14px">${esc(Shift.PATTERN_LABELS[p])}　` +
     (rem ? `<b class="c-orange">有給残：${rem.shifts}出番</b>（${rem.days}日）<span style="color:#666">　${ymJp(ym)}分の締め日（${dMonth(asOf)}/${dDay(asOf)}）時点</span>` : '<span style="color:#666">入社年月日が未入力のため、有給残は計算できません（取得日だけ表示します）。</span>') + '</div>';
   if (!entries.length) body += '<div style="padding:12px 0;color:#666">有給の記録はありません。</div>';
-  else if (!hire) body += `<div class="plgrp">${entries.map(row).join('')}</div>`;
+  else if (!hire) body += `<div class="plgrp">${entries.slice().reverse().map(row).join('')}</div>`;
   else {
     // 付与日ごとに区切る（付与日〜次の付与日の前日）
     const last = entries[0].d > today ? entries[0].d : today;
@@ -357,11 +357,12 @@ function showPaidList(ym) {
     const groups = [];
     gs.forEach((g, i) => {
       const end = i + 1 < gs.length ? addDays(gs[i + 1].date, -1) : null;
-      const list = entries.filter(x => x.d >= g.date && (end === null || x.d <= end));
+      // 期間の中は古い順（取った順）に並べる。期間の枠は新しい順のまま
+      const list = entries.filter(x => x.d >= g.date && (end === null || x.d <= end)).reverse();
       if (g.date > last && !list.length) return;
       groups.push({ g, end, list });
     });
-    const before = entries.filter(x => !gs.length || x.d < gs[0].date);
+    const before = entries.filter(x => !gs.length || x.d < gs[0].date).reverse();
     groups.reverse();
     body += groups.map((gr, i) => {
       const used = gr.list.filter(x => !x.consumed).length, cons = gr.list.length - used;
