@@ -260,11 +260,13 @@ function cellHtml(d, led, red, marks, today, simple) {
   const dnCls = ['dn', closing ? 'cl' : '', hol ? 'hol' : '', d === today ? 'td' : '', w === 0 ? 'su' : '', w === 6 ? 'sa' : ''].join(' ');
   const wx = Weather.data[d]; const wxIcon = wx ? Weather.icon(wx.code) : '';
   let h = `<div class="cell day${red.has(d) && !simple ? ' red' : ''}" data-d="${d}" style="background:${bg}">` +
-    `<div class="r1"><span class="${dnCls}">${closing ? '&lt;18&gt;' : dDay(d)}</span>${marks.has(d) && !simple ? '<span class="gm">㊒</span>' : ''}<span class="sp"></span>` +
+    `<div class="r1"><span class="${dnCls}">${closing ? '&lt;18&gt;' : dDay(d)}</span><span class="sp"></span>` +
     (wxIcon ? `<span class="wx${closing ? ' sm' : ''}">${wxIcon}</span>` : '') + '</div>';
   if (simple) return h + '</div>';   // 金額・有給・欠勤などの文字は出さない
   const vbg = dn ? 'rgba(255,255,255,.13)' : (valueColor(value, false) || '#fff');
-  h += `<div class="drv">${Shift.workingDrivers(d)}</div><div class="duty">${Shift.dutyOfficer(d)}</div>` +
+  const memo = (data.memos || {})[d];
+  // ㊒（有給付与日）は乗務の班の後ろに付ける
+  h += `<div class="drv">${Shift.workingDrivers(d)}${marks.has(d) ? '<span class="gm">㊒</span>' : ''}</div><div class="duty">${Shift.dutyOfficer(d)}${memo ? '<span class="mm" title="メモあり">㋱</span>' : ''}</div>` +
     `<div class="val${Values.isRevenue(value) ? ' rev' : ''}" style="background:${vbg}">${esc(shortValue(value))}</div></div>`;
   return h;
 }
@@ -290,8 +292,9 @@ function summaryHtml(s, p) {
   }
   if (s.remainingToClear <= 0) { const over = -s.remainingToClear; r2.push(it('責任出番：クリア' + (s.dailyNight && over > 0 ? `（+${over}）` : ''), 'c-green b')); }
   else r2.push(it(`クリアまで：${s.remainingToClear}${s.dailyNight ? '回' : '出番'}`, 'c-amber b'));
-  if (!s.hasHireDate) r2.push(it('有給残：--', 'c-gray'));
-  else r2.push(it(`有給残：${s.paidRemaining ? s.paidRemaining.shifts : 0}出番`, 'c-orange b'));
+  // 有給残はタップすると有給取得のリストを出す
+  if (!s.hasHireDate) r2.push(`<button class="paidlink c-gray" data-paid="${s.ym}">有給残：-- ▸</button>`);
+  else r2.push(`<button class="paidlink c-orange b" data-paid="${s.ym}">有給残：${s.paidRemaining ? s.paidRemaining.shifts : 0}出番 ▸</button>`);
   if (s.dailyNight && s.shortage > 0) r2.push(it(`⚠ 予定が${s.shortage}回不足`, 'c-alert b'));
   const r3 = [];
   if (!s.dailyNight || s.extraCount > 0) { r3.push(it(`出番：${yen(s.baseRevenue)}円`)); r3.push(it(`公出：${yen(s.extraRevenue)}円`)); }
@@ -331,6 +334,77 @@ function buildRange(center) {
   for (let ym = rangeStart; ym <= rangeEnd; ym++) monthsEl.appendChild(makeSection(ym));
 }
 function sectionOf(ym) { return monthsEl.querySelector(`section[data-ym="${ym}"]`); }
+// ===== 有給取得のリスト（有給残をタップ）=====
+/** 有給の日を付与期間ごとにまとめて表示。日付を押すとカレンダーのその日へ移動する */
+function showPaidList(ym) {
+  const L = ledger(), p = pattern(), hire = data.hireDate, today = todayIso();
+  const entries = Object.keys(L.store).filter(d => Values.isPaid(L.store[d])).sort().reverse()
+    .map(d => ({ d, consumed: L.isConsumed(d) }));
+  const asOf = Shift.periodEnd(ym);
+  const rem = L.paidRemaining(asOf);
+  const dps = L.dps;
+  const fmtD = d => `${dYear(d)}/${dMonth(d)}/${dDay(d)}(${WEEK[dow(d)]})`;
+  const row = x => `<button class="plrow" data-go="${x.d}"><span>${fmtD(x.d)}</span>` +
+    (x.consumed ? '<span class="pltag gray">公出消（残は減らない）</span>' : '<span class="pltag">有給</span>') +
+    (x.d > today ? '<span class="pltag blue">予定</span>' : '') + '</button>';
+  const headInfo = `<div class="plhead">${esc(Shift.PATTERN_LABELS[p])}　` +
+    (rem ? `<b class="c-orange">有給残：${rem.shifts}出番</b>（${rem.days}日）<span style="color:#666">　${ymJp(ym)}分の締め日（${dMonth(asOf)}/${dDay(asOf)}）時点</span>` : '<span style="color:#666">入社年月日が未入力のため、有給残は計算できません（取得日だけ表示します）。</span>') + '</div>';
+  let body = '';
+  if (!entries.length) body += '<div style="padding:12px 0;color:#666">有給の記録はありません。</div>';
+  else if (!hire) body += `<div class="plgrp">${entries.slice().reverse().map(row).join('')}</div>`;
+  else {
+    // 付与日ごとに区切る（付与日〜次の付与日の前日）
+    const last = entries[0].d > today ? entries[0].d : today;
+    const gs = PaidLeave.grants(hire, addDays(last, 400));
+    const marks = L.allGrantMarks;
+    const groups = [];
+    gs.forEach((g, i) => {
+      const end = i + 1 < gs.length ? addDays(gs[i + 1].date, -1) : null;
+      // 期間の中は古い順（取った順）に並べる。期間の枠は新しい順のまま
+      const list = entries.filter(x => x.d >= g.date && (end === null || x.d <= end)).reverse();
+      if (g.date > last && !list.length) return;
+      groups.push({ g, end, list });
+    });
+    const before = entries.filter(x => !gs.length || x.d < gs[0].date).reverse();
+    if (before.length) body += `<details class="plgrp"><summary><b>最初の付与より前</b></summary>${before.map(row).join('')}</details>`;
+    body += groups.map((gr, i) => {
+      const used = gr.list.filter(x => !x.consumed).length, cons = gr.list.length - used;
+      const m = marks.get(gr.g.date);
+      const head = `${dYear(gr.g.date)}/${dMonth(gr.g.date)}/${dDay(gr.g.date)}〜${gr.end ? `${dYear(gr.end)}/${dMonth(gr.end)}/${dDay(gr.end)}` : ''}`;
+      // 繰越＝付与した直後の合計から今回の付与分を引いた日数（前の年から持ち越した分）
+      const carry = m ? Math.max(0, m.cumulative - Math.min(gr.g.days, PaidLeave.MAX_GRANT)) : null;
+      const line1 = `${gr.g.days}日付与${carry === null ? '' : carry > 0 ? `＋繰越${carry}日` : '・繰越なし'}${m ? `（付与後の有給残 ${m.remainingShifts}出番）` : ''}`;
+      const plan = gr.list.filter(x => !x.consumed && x.d > today).length;
+      const line2 = `使った有給：${used * dps}日（${used}出番${plan ? `・うち予定${plan}回` : ''}）${cons ? `　公出消：${cons}回` : ''}`;
+      return `<details class="plgrp"${i >= groups.length - 2 ? ' open' : ''}${i === groups.length - 1 ? ' id="plNow"' : ''}><summary><b>${head}</b><br><span style="font-size:12px;color:#555">${line1}<br>${line2}</span></summary>` +
+        (gr.list.length ? gr.list.map(row).join('') : '<div style="padding:6px 4px;color:#888;font-size:13px">この期間の有給はありません</div>') + '</details>';
+    }).join('');
+  }
+  body += '<div style="font-size:12px;color:#666">日付を押すと、カレンダーのその日に移動します。</div>';
+  openDialog({
+    title: '📋 有給取得のリスト' + headInfo, body,
+    onMount: (ov, close) => {
+      // 古い順に並ぶので、開いた時は一番下の今の期間の見出しまで送っておく
+      const now = ov.querySelector('#plNow'), db = ov.querySelector('.db');
+      const toNow = () => { if (now) db.scrollTop += now.getBoundingClientRect().top - db.getBoundingClientRect().top - 4; };
+      toNow(); requestAnimationFrame(toNow); setTimeout(toNow, 120);   // 表示が落ち着いてからもう一度
+      ov.addEventListener('click', e => {
+        const b = e.target.closest('[data-go]'); if (!b) return;
+        close(); jumpToDate(b.dataset.go);
+      });
+    },
+    buttons: [{ label: '閉じる' }]
+  });
+}
+/** カレンダーのその日へ移動して、少しの間光らせる */
+function jumpToDate(d) {
+  scrollToMonth(ymOf(d), true);
+  setTimeout(() => {
+    const c = monthsEl.querySelector(`[data-d="${d}"]`); if (!c) return;
+    c.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 2000);
+  }, 350);
+}
 function scrollToMonth(ym, smooth) {
   if (ym < rangeStart || ym > rangeEnd) buildRange(ym);
   const s = sectionOf(ym);
@@ -429,6 +503,8 @@ $('#modeSw').addEventListener('click', e => {
 $('#title').addEventListener('click', () => monthPicker(topMonth()));
 $('#gear').addEventListener('click', () => go('setting'));
 monthsEl.addEventListener('click', e => {
+  const pl = e.target.closest('[data-paid]');
+  if (pl) { showPaidList(+pl.dataset.paid); return; }
   const rv = e.target.closest('[data-rv]');
   if (rv) { startRevenueImport(+rv.dataset.rv); return; }
   const sal = e.target.closest('[data-sal]');
@@ -464,6 +540,13 @@ function monthPicker(initial) {
 }
 
 // ===== 日付の入力ダイアログ =====
+/** その日のメモを保存（空なら消す）。render=true で画面を描き直す */
+function saveMemo(d, text, render) {
+  const t = String(text || '').trim(), m = Object.assign({}, data.memos || {});
+  if ((m[d] || '') === t) { if (render) refreshAll(); return; }
+  if (t) m[d] = t; else delete m[d];
+  update(Object.assign({}, data, { memos: m }), { noRender: !render });
+}
 function dayDialog(d) {
   const led = ledger(), p = led.pattern, dn = p === DAILY_NIGHT;
   const current = led.displayValue(d);
@@ -491,15 +574,21 @@ function dayDialog(d) {
     `<div class="field" style="margin-top:6px"><label for="rev">営収（円）</label><div class="inwrap">` +
     `<input id="rev" class="inp" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" placeholder="例：45270" value="${init.length <= Values.MAX_DIGITS ? init : ''}">` +
     `<button class="clr" id="clr" aria-label="入力を消す" ${init ? '' : 'hidden'}>✕</button></div><div class="errtxt" id="err"></div></div>` +
-    `<div class="wbtns">${words.map(x => `<button data-w="${x}"${noPaid && x === '有給' ? ' disabled aria-label="有給（土日祝は取得できません）"' : ''}>${x}</button>`).join('')}</div>`;
+    `<div class="wbtns">${words.map(x => `<button data-w="${x}"${noPaid && x === '有給' ? ' disabled aria-label="有給（土日祝は取得できません）"' : ''}>${x}</button>`).join('')}</div>` +
+    `<div class="field"><textarea id="memo" class="inp memo" rows="2" maxlength="300" placeholder="メモ" aria-label="メモ">${esc((data.memos || {})[d] || '')}</textarea></div>`;
   openDialog({
     title: `${dMonth(d)}月${dDay(d)}日（${WEEK[dow(d)]}）` + (hn ? `<div class="hn">${esc(hn)}</div>` : ''),
     body,
-    buttons: [{ label: '閉じる' }, { label: '営収を保存', cls: '', id: 'saveRev', onClick: () => false }],
+    buttons: [{ label: '閉じる', onClick: () => { saveMemo(d, document.querySelector('#memo').value, true); } }, { label: '保存', cls: '', id: 'saveRev', onClick: () => false }],
     onMount: (ov, close) => {
       const inp = ov.querySelector('#rev'), err = ov.querySelector('#err'), clr = ov.querySelector('#clr');
+      // メモは入力のたびに保存（画面の描き直しは閉じる時だけ）
+      const memoEl = ov.querySelector('#memo'); let memoTimer = 0;
+      memoEl.addEventListener('input', () => { clearTimeout(memoTimer); memoTimer = setTimeout(() => saveMemo(d, memoEl.value, false), 400); });
+      ov.addEventListener('click', e => { if (e.target === ov) { clearTimeout(memoTimer); saveMemo(d, memoEl.value, true); } }, true);
       const setErr = m => { err.textContent = m || ''; inp.classList.toggle('err', !!m); };
       const send = raw => {
+        clearTimeout(memoTimer); saveMemo(d, memoEl.value, false);
         const r = submit(d, raw);
         if (!r.ok && r.msg && r.msg.startsWith('営収は')) { setErr(r.msg); return; }
         if (r.msg) toast(r.msg);
@@ -514,8 +603,10 @@ function dayDialog(d) {
       clr.addEventListener('click', () => { inp.value = ''; clr.hidden = true; setErr(''); inp.focus(); });
       inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) send(inp.value); });
       ov.querySelector('.wbtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) send(b.dataset.w === 'クリア' ? '' : b.dataset.w); });
+      // 「保存」：営収が入っていれば営収とメモ、空ならメモだけ保存して閉じる
       ov.querySelector('#saveRev').addEventListener('click', () => {
-        if (!inp.value.trim()) setErr('営収を入力するか、上のボタンを選んでください'); else send(inp.value);
+        if (inp.value.trim()) { send(inp.value); return; }
+        clearTimeout(memoTimer); saveMemo(d, memoEl.value, true); close();
       });
     }
   });
@@ -806,13 +897,14 @@ function renderSetting() {
     ${standalone ? '' : `<div class="card" style="background:#FFF8E8"><h2>📱 ホーム画面に追加</h2>
       <div style="font-size:14px">Safariの共有ボタン（□↑）→「ホーム画面に追加」で、アプリのように全画面で使えます。ホーム画面から開くと、しばらく使わなくてもデータが消されにくくなります。</div></div>`}
     <div class="card" style="background:#F8F8FF"><h2>📖 使い方</h2><ul class="help">
-      <li>日付をタップすると入力画面が開きます。営収（数字）か、ボタン（出・休・有給・欠勤・出変）で入力します。</li>
-      <li>背景色：濃い紫＝営収入力済み、薄い赤＝有給、赤＝欠勤。</li>
-      <li>赤枠：まだ残っている公出の日。</li>
-      <li>隔日：2026年4月19日以降、公出が残っている月に有給を入れると「公出消」（公出の取消し）になり、有給残は減りません。公出がなく有給残もないと入力できません。欠勤は出番日にだけ入力できます。</li>
-      <li>日勤・夜勤：空欄の平日は自動で「出」、土日祝は「休」が入ります。責任出番クリアの条件は 乗務回数＋有給取得数 ≧ 責任出番数（1月・5月は20回、他は22回）。土日祝は有給を取得できません。公出（平日と土日祝の「出」の合計が責任出番を超えた分）がある月に有給を入れると「公出消」になり、有給残は減りません。欠勤は先に公出を消します。公出がなく有給残もないと入力できません。</li>
-      <li>締め期間は前月19日〜当月18日。カレンダーの &lt;18&gt; が締め日です。</li>
-      <li>上の年月をタップすると、好きな年月へ移動できます。</li>
+      <li><b>入力</b>　日付をタップ → 営収の数字か、ボタン（出・休・有給・欠勤・出変）で入力。「保存」で閉じます。</li>
+      <li><b>メモ</b>　入力画面の一番下に書けます（自動で保存）。メモがある日は <b style="color:#7B1FA2">㋱</b> が付きます。</li>
+      <li><b>色と印</b>　濃い紫＝営収あり、薄い赤＝有給、赤＝欠勤、赤枠＝残っている公出、㊒＝有給の付与日。</li>
+      <li><b>締め期間</b>　前月19日〜当月18日（&lt;18&gt; が締め日）。上の年月をタップすると、好きな月へ移動できます。</li>
+      <li><b>有給取得のリスト</b>　集計欄の「有給残 ▸」をタップ。付与期間ごとに、取った日・公出消・予定が古い順に並びます。日付を押すとその日へ移動します。</li>
+      <li><b>営収取込</b>　集計欄の「📷 営収取込」で、会社の端末の「指導用データ」を撮影すると、その期間の営収をまとめて入れます（合言葉が必要）。</li>
+      <li><b>公出と有給</b>　公出が残っている月の有給は「公出消」になり、有給残は減りません（隔日は2026/4/19以降）。公出も有給残もないと入力できません。</li>
+      <li><b>日勤・夜勤</b>　空欄の平日は「出」、土日祝は「休」が自動で入ります。責任出番は 乗務＋有給 が22回（1月・5月は20回）以上でクリア。土日祝は有給を取れません。</li>
     </ul></div>
   </div>`;
   v.querySelector('.back').onclick = back;
