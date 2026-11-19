@@ -579,20 +579,37 @@ function dayDialog(d) {
   openDialog({
     title: `${dMonth(d)}月${dDay(d)}日（${WEEK[dow(d)]}）` + (hn ? `<div class="hn">${esc(hn)}</div>` : ''),
     body,
-    buttons: [{ label: '閉じる', onClick: () => { saveMemo(d, document.querySelector('#memo').value, true); } }, { label: '保存', cls: '', id: 'saveRev', onClick: () => false }],
+    dismissable: false,   // 外側タップ・戻るボタンは下で「キャンセル」として扱う
+    buttons: [{ label: 'キャンセル', id: 'cancelDay', onClick: () => false }, { label: '保存', cls: '', id: 'saveRev', onClick: () => false }],
     onMount: (ov, close) => {
       const inp = ov.querySelector('#rev'), err = ov.querySelector('#err'), clr = ov.querySelector('#clr');
-      // メモは入力のたびに保存（画面の描き直しは閉じる時だけ）
-      const memoEl = ov.querySelector('#memo'); let memoTimer = 0;
-      memoEl.addEventListener('input', () => { clearTimeout(memoTimer); memoTimer = setTimeout(() => saveMemo(d, memoEl.value, false), 400); });
-      ov.addEventListener('click', e => { if (e.target === ov) { clearTimeout(memoTimer); saveMemo(d, memoEl.value, true); } }, true);
+      // メモは「保存」か、出・有給などのボタンを押した時だけ保存する（キャンセルなら捨てる）
+      const memoEl = ov.querySelector('#memo'), memo0 = memoEl.value.trim();
+      const memoChanged = () => memoEl.value.trim() !== memo0;
+      // Androidの戻るボタンで入力画面だけを閉じられるよう、履歴を1つ積んでおく
+      history.pushState(Object.assign({}, history.state, { dlg: 1 }), '', location.href);
+      dialogBack = () => cancel(true);
+      const done = () => {
+        if (dialogBack) { dialogBack = null; ignorePop = true; history.back(); }   // 積んだ履歴を戻す
+        close();
+      };
+      const cancel = fromBack => {
+        if (!memoChanged()) { if (fromBack) { dialogBack = null; close(); } else done(); return; }
+        if (fromBack) { history.pushState(Object.assign({}, history.state, { dlg: 1 }), '', location.href); dialogBack = () => cancel(true); }
+        openDialog({
+          title: 'メモの変更を捨てますか？', body: '<div>書き換えたメモは保存されません。</div>',
+          buttons: [{ label: '戻る' }, { label: '捨てる', cls: 'danger', onClick: () => { done(); } }]
+        });
+      };
+      ov.addEventListener('click', e => { if (e.target === ov) cancel(false); });
+      ov.querySelector('#cancelDay').addEventListener('click', () => cancel(false));
       const setErr = m => { err.textContent = m || ''; inp.classList.toggle('err', !!m); };
       const send = raw => {
-        clearTimeout(memoTimer); saveMemo(d, memoEl.value, false);
         const r = submit(d, raw);
         if (!r.ok && r.msg && r.msg.startsWith('営収は')) { setErr(r.msg); return; }
+        if (memoChanged()) saveMemo(d, memoEl.value, true);
         if (r.msg) toast(r.msg);
-        close();
+        done();
       };
       inp.addEventListener('input', () => {
         const digits = inp.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 48)).replace(/\D/g, '');
@@ -606,7 +623,7 @@ function dayDialog(d) {
       // 「保存」：営収が入っていれば営収とメモ、空ならメモだけ保存して閉じる
       ov.querySelector('#saveRev').addEventListener('click', () => {
         if (inp.value.trim()) { send(inp.value); return; }
-        clearTimeout(memoTimer); saveMemo(d, memoEl.value, true); close();
+        saveMemo(d, memoEl.value, true); done();
       });
     }
   });
@@ -691,7 +708,11 @@ function showView(view) {
   else if (view === 'setting') { renderSetting(); window.scrollTo(0, 0); }
   else { refreshAll(); window.scrollTo(0, savedScroll); }
 }
+let dialogBack = null;   // 入力画面が開いている時に戻るボタンを押したら呼ぶ
+let ignorePop = false;   // 入力画面を閉じた時に自分で戻した履歴は無視する
 window.addEventListener('popstate', () => {
+  if (ignorePop) { ignorePop = false; return; }
+  if (dialogBack) { const f = dialogBack; dialogBack = null; f(); return; }
   document.querySelectorAll('.ov').forEach(o => o.remove());
   const h = location.hash.slice(1);
   showView(h === 'salary' || h === 'setting' ? h : 'cal');
@@ -897,8 +918,8 @@ function renderSetting() {
     ${standalone ? '' : `<div class="card" style="background:#FFF8E8"><h2>📱 ホーム画面に追加</h2>
       <div style="font-size:14px">Safariの共有ボタン（□↑）→「ホーム画面に追加」で、アプリのように全画面で使えます。ホーム画面から開くと、しばらく使わなくてもデータが消されにくくなります。</div></div>`}
     <div class="card" style="background:#F8F8FF"><h2>📖 使い方</h2><ul class="help">
-      <li><b>入力</b>　日付をタップ → 営収の数字か、ボタン（出・休・有給・欠勤・出変）で入力。「保存」で閉じます。</li>
-      <li><b>メモ</b>　入力画面の一番下に書けます（自動で保存）。メモがある日は <b style="color:#7B1FA2">㋱</b> が付きます。</li>
+      <li><b>入力</b>　日付をタップ → 営収の数字か、ボタン（出・休・有給・欠勤・出変）で入力。「保存」で保存、「キャンセル」や戻るボタンで保存せずに閉じます。</li>
+      <li><b>メモ</b>　入力画面の一番下に書き、「保存」で保存します。メモがある日は <b style="color:#7B1FA2">㋱</b> が付きます。</li>
       <li><b>色と印</b>　濃い紫＝営収あり、薄い赤＝有給、赤＝欠勤、赤枠＝残っている公出、㊒＝有給の付与日。</li>
       <li><b>締め期間</b>　前月19日〜当月18日（&lt;18&gt; が締め日）。上の年月をタップすると、好きな月へ移動できます。</li>
       <li><b>有給取得のリスト</b>　集計欄の「有給残 ▸」をタップ。付与期間ごとに、取った日・公出消・予定が古い順に並びます。日付を押すとその日へ移動します。</li>
