@@ -72,6 +72,15 @@ function openDialog({ title, body, buttons, onMount, dismissable = true }) {
   if (onMount) onMount(ov, close);
   return close;
 }
+// キーボードが出ても入力画面の「保存」が隠れないよう、画面の見えている範囲に合わせる
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const fitView = () => {
+    const r = document.documentElement.style;
+    r.setProperty('--vvh', vv.height + 'px'); r.setProperty('--vvt', vv.offsetTop + 'px');
+  };
+  vv.addEventListener('resize', fitView); vv.addEventListener('scroll', fitView); fitView();
+}
 function showAlert(msg, pensionFrom) {
   openDialog({
     title: '確認してください', body: `<pre>${esc(msg)}</pre>`,
@@ -615,13 +624,15 @@ function dayDialog(d) {
       // 入力欄が最初のまま（出・有給などをそのまま）なら、入力は変えずにメモだけ保存する
       // 入力欄を空にして保存したら、その日の入力を消す（「クリア」と同じ）
       const revChanged = () => inp.value.trim() !== init.trim();
-      inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) { if (revChanged()) send(inp.value); else { saveMemo(d, memoEl.value, true); done(); } } });
+      // キーボードの ✓（Enter）は「保存」と同じ
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
       ov.querySelector('.wbtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) send(b.dataset.w === 'クリア' ? '' : b.dataset.w); });
       // 「保存」：入力欄を変えていれば入力とメモ、変えていなければメモだけ保存して閉じる
-      ov.querySelector('#saveRev').addEventListener('click', () => {
+      const save = () => {
         if (revChanged()) { send(inp.value); return; }
         saveMemo(d, memoEl.value, true); done();
-      });
+      };
+      ov.querySelector('#saveRev').addEventListener('click', save);
     }
   });
 }
