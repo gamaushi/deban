@@ -302,8 +302,8 @@ function summaryHtml(s, p) {
   if (s.remainingToClear <= 0) { const over = -s.remainingToClear; r2.push(it('責任出番：クリア' + (s.dailyNight && over > 0 ? `（+${over}）` : ''), 'c-green b')); }
   else r2.push(it(`クリアまで：${s.remainingToClear}${s.dailyNight ? '回' : '出番'}`, 'c-amber b'));
   // 有給残はタップすると有給取得のリストを出す
-  if (!s.hasHireDate) r2.push(`<button class="paidlink c-gray" data-paid="${s.ym}">有給残：-- ▸</button>`);
-  else r2.push(`<button class="paidlink c-orange b" data-paid="${s.ym}">有給残：${s.paidRemaining ? s.paidRemaining.shifts : 0}出番 ▸</button>`);
+  if (!s.hasHireDate) r2.push(`<button class="paidlink c-gray" data-paid="${s.ym}">有給残：--（有給取得リスト）</button>`);
+  else r2.push(`<button class="paidlink c-orange b" data-paid="${s.ym}">有給残：${s.paidRemaining ? s.paidRemaining.shifts : 0}出番（有給取得リスト）</button>`);
   if (s.dailyNight && s.shortage > 0) r2.push(it(`⚠ 予定が${s.shortage}回不足`, 'c-alert b'));
   const r3 = [];
   if (!s.dailyNight || s.extraCount > 0) { r3.push(it(`出番：${yen(s.baseRevenue)}円`)); r3.push(it(`公出：${yen(s.extraRevenue)}円`)); }
@@ -930,7 +930,7 @@ function renderSetting() {
       <li><b>メモ</b>　入力画面の一番下に書き、「保存」で保存します。メモがある日は <b style="color:#7B1FA2">㋱</b> が付きます。</li>
       <li><b>色と印</b>　濃い紫＝営収あり、薄い赤＝有給、赤＝欠勤、赤枠＝残っている公出、㊒＝有給の付与日。</li>
       <li><b>締め期間</b>　前月19日〜当月18日（&lt;18&gt; が締め日）。上の年月をタップすると、好きな月へ移動できます。</li>
-      <li><b>有給取得のリスト</b>　集計欄の「有給残 ▸」をタップ。付与期間ごとに、取った日・公出消・予定が古い順に並びます。日付を押すとその日へ移動します。</li>
+      <li><b>有給取得のリスト</b>　集計欄の「有給残：○出番（有給取得リスト）」をタップ。付与期間ごとに、取った日・公出消・予定が古い順に並びます。日付を押すとその日へ移動します。</li>
       <li><b>営収取込</b>　集計欄の「📷 営収取込」で、会社の端末の「指導用データ」を撮影すると、その期間の営収をまとめて入れます（合言葉が必要）。</li>
       <li><b>公出と有給</b>　公出が残っている月は、有給を入れると「公出消」になり、有給にはなりません。<br>※隔日勤務は 2026/4/19 からのルールです。</li>
       <li><b>日勤・夜勤</b>　空欄の平日は「出」、土日祝は「休」が自動で入ります。責任出番は 乗務＋有給 が22回（1月・5月は20回）以上でクリア。土日祝は有給を取れません。</li>
