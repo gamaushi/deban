@@ -554,7 +554,6 @@ function dayDialog(d) {
   const grant = led.allGrantMarks.get(d);
   const hn = Holidays.nameOf(d);
   let info = `<div>乗務：${Shift.workingDrivers(d)}　当番：${Shift.dutyOfficer(d)}</div>`;
-  if (!dn && Shift.isShiftDay(d, p)) info += `<div style="font-size:14px;color:#555">この日は${Shift.PATTERN_LABELS[p]}の出番日です</div>`;
   const w = Weather.data[d];
   if (w) {
     let t = Weather.icon(w.code) + ' ';
@@ -567,12 +566,12 @@ function dayDialog(d) {
   if (red) info += `<div style="font-size:14px;color:red">赤枠：残っている公出の日</div>`;
   const noPaid = dn && paidBlockedDay(d);
   if (noPaid) info += `<div style="font-size:14px;color:red">土日祝は有給を取得できません</div>`;
-  info += `<div>現在の入力：${current === '' ? '（なし）' : esc(shortValue(current))}</div>`;
-  const init = Values.isRevenue(current) ? String(Values.revenue(current)) : '';
+  // 今の入力は入力欄に入れておく（営収は数字、出・有給などはその文字）
+  const init = Values.isRevenue(current) ? String(Values.revenue(current)) : String(current || '');
   const words = dn ? ['出', '休', '有給', '欠勤', '出変', 'クリア'] : ['出', '有給', '欠勤', '出変', '休', 'クリア'];
   const body = info +
-    `<div class="field" style="margin-top:6px"><label for="rev">営収（円）</label><div class="inwrap">` +
-    `<input id="rev" class="inp" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" placeholder="例：45270" value="${init.length <= Values.MAX_DIGITS ? init : ''}">` +
+    `<div class="field" style="margin-top:6px"><div class="inwrap">` +
+    `<input id="rev" class="inp" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" placeholder="営収" aria-label="営収" value="${init.length <= Values.MAX_DIGITS ? esc(init) : ''}">` +
     `<button class="clr" id="clr" aria-label="入力を消す" ${init ? '' : 'hidden'}>✕</button></div><div class="errtxt" id="err"></div></div>` +
     `<div class="wbtns">${words.map(x => `<button data-w="${x}"${noPaid && x === '有給' ? ' disabled aria-label="有給（土日祝は取得できません）"' : ''}>${x}</button>`).join('')}</div>` +
     `<div class="field"><textarea id="memo" class="inp memo" rows="2" maxlength="300" placeholder="メモ" aria-label="メモ">${esc((data.memos || {})[d] || '')}</textarea></div>`;
@@ -613,11 +612,13 @@ function dayDialog(d) {
         clr.hidden = inp.value === '';
       });
       clr.addEventListener('click', () => { inp.value = ''; clr.hidden = true; setErr(''); inp.focus(); });
-      inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) send(inp.value); });
+      // 入力欄が最初のまま（出・有給などをそのまま）なら、入力は変えずにメモだけ保存する
+      const revChanged = () => inp.value.trim() !== '' && inp.value !== init;
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) { if (revChanged()) send(inp.value); else { saveMemo(d, memoEl.value, true); done(); } } });
       ov.querySelector('.wbtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) send(b.dataset.w === 'クリア' ? '' : b.dataset.w); });
       // 「保存」：営収が入っていれば営収とメモ、空ならメモだけ保存して閉じる
       ov.querySelector('#saveRev').addEventListener('click', () => {
-        if (inp.value.trim()) { send(inp.value); return; }
+        if (revChanged()) { send(inp.value); return; }
         saveMemo(d, memoEl.value, true); done();
       });
     }
