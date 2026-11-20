@@ -579,7 +579,7 @@ function dayDialog(d) {
   openDialog({
     title: `${dMonth(d)}月${dDay(d)}日（${WEEK[dow(d)]}）` + (hn ? `<div class="hn">${esc(hn)}</div>` : ''),
     body,
-    dismissable: false,   // 外側タップ・戻るボタンは下で「キャンセル」として扱う
+    dismissable: false,   // 外側タップでは閉じない。戻るボタンは下で「キャンセル」として扱う
     buttons: [{ label: 'キャンセル', id: 'cancelDay', onClick: () => false }, { label: '保存', cls: '', id: 'saveRev', onClick: () => false }],
     onMount: (ov, close) => {
       const inp = ov.querySelector('#rev'), err = ov.querySelector('#err'), clr = ov.querySelector('#clr');
@@ -593,15 +593,10 @@ function dayDialog(d) {
         if (dialogBack) { dialogBack = null; ignorePop = true; history.back(); }   // 積んだ履歴を戻す
         close();
       };
+      // キャンセル・戻るボタンは確認なしで閉じる（メモは保存しない）。外側のタップでは閉じない
       const cancel = fromBack => {
-        if (!memoChanged()) { if (fromBack) { dialogBack = null; close(); } else done(); return; }
-        if (fromBack) { history.pushState(Object.assign({}, history.state, { dlg: 1 }), '', location.href); dialogBack = () => cancel(true); }
-        openDialog({
-          title: 'メモを保存せずに閉じますか？', body: '<div>書き換えたメモは元に戻ります。</div>',
-          buttons: [{ label: '編集を続ける' }, { label: '保存せずに閉じる', cls: 'ghost danger', onClick: () => { done(); } }]
-        });
+        if (fromBack) { dialogBack = null; close(); } else done();
       };
-      ov.addEventListener('click', e => { if (e.target === ov) cancel(false); });
       ov.querySelector('#cancelDay').addEventListener('click', () => cancel(false));
       const setErr = m => { err.textContent = m || ''; inp.classList.toggle('err', !!m); };
       const send = raw => {
