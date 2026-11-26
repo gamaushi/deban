@@ -38,7 +38,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 /* パソコンなど広い画面では、横に間延びしないよう幅に上限をつけて真ん中に置く */
 @media (min-width: 900px) {
   html { background: #CBD5E1; }
-  body { max-width: 860px; margin: 0 auto; box-shadow: 0 0 24px rgba(0,0,0,.18); min-height: 100vh; }
+  body { max-width: 860px; margin: 0 auto; box-shadow: 0 0 24px rgba(0,0,0,.18); min-height: 100vh; zoom: 1.2; }
+}
+/* パソコンの大きな画面では、さらに全体を拡大する（スマホの文字の大きさのままだと小さく見えるため） */
+@media (min-width: 1400px) {
+  body { zoom: 1.3; }
 }
 #top { position: sticky; top: var(--safe-t); z-index: 20; background: var(--bg); }
 .bar { display: flex; align-items: center; gap: 4px; background: var(--band); color: var(--band-ink);
