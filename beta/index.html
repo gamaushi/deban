@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="出番ですョ!">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#DDF0FC">
+<meta name="color-scheme" content="only light">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -22,7 +23,7 @@
   --c-revenue: #D8BFD8; --c-work: #E6E6FA; --c-paid: #FFE6E6; --c-absent: #FFCCCC;
   --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
-  color-scheme: light;
+  color-scheme: only light;   /* ブラウザのナイトモード（自動で暗くする機能）を止める */
   --k: 1;   /* 端末の文字サイズ設定を打ち消す倍率（app.js で計算） */
 }
 [hidden] { display: none !important; }
