@@ -42,9 +42,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 .row:active{background:#F3EFE4}
 .row .lab{flex:1;font-size:18px;font-weight:bold}
 .row .val{width:130px;text-align:right;font-size:18px;font-variant-numeric:tabular-nums;line-height:1.2;
-  padding:3px 8px;border:1px solid transparent;border-radius:6px;background:none;min-height:29px}
-/* 空の欄はアプリ版と同じく薄い「0」を出す */
-.row .val:empty::before{content:"0";color:#E3DED2;font-style:normal;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  padding:3px 8px;border:1px solid var(--rule);border-radius:6px;background:#fff;min-height:29px}
 .row.hand .val{font-style:italic;font-family:"Hiragino Mincho ProN",serif;color:var(--ink-soft)}
 .row .val.qq{color:var(--warn);font-weight:bold;font-style:normal}
 .row .val.low{background:var(--low-bg);border-color:var(--low-line)}
