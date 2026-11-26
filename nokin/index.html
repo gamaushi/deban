@@ -27,6 +27,11 @@ html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);
 body{display:flex;flex-direction:column;height:100dvh;
   padding-top:env(safe-area-inset-top);user-select:none;-webkit-user-select:none}
 button{font:inherit;cursor:pointer}
+/* 折りたたみスマホを広げた画面やパソコンでは、幅に上限をつけて真ん中に置く（項目名と金額が離れすぎないように） */
+@media (min-width:600px){
+  html{background:#CBD5E1}
+  body{max-width:520px;margin:0 auto;box-shadow:0 0 24px rgba(0,0,0,.18)}
+}
 
 /* ---- 上の帯 ---- */
 header{display:flex;align-items:center;gap:8px;padding:5px 14px 4px;border-bottom:1px solid var(--rule);
