@@ -11,6 +11,8 @@ const ymJp = ym => `${ymY(ym)}年${ymM(ym)}月`;
 // 試験版（/deban/beta/）は本物と別の場所に保存する。初めて開いた時だけ本物のデータをコピーする
 const BETA = /\/beta\//.test(location.pathname);
 const LS_DATA = BETA ? 'deban_data_beta' : 'deban_data';
+// 納金電卓（同じリポジトリの nokin/）。試験版から開いても本物の納金電卓へ行く
+const NOKIN_URL = BETA ? '../nokin/' : './nokin/';
 if (BETA && lsGet(LS_DATA) === null && lsGet('deban_data') !== null) lsSet(LS_DATA, lsGet('deban_data'));
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
@@ -311,7 +313,7 @@ function summaryHtml(s, p) {
   if (!s.dailyNight || s.extraCount > 0) { r3.push(it(`出番：${yen(s.baseRevenue)}円`)); r3.push(it(`公出：${yen(s.extraRevenue)}円`)); }
   r3.push(it(`月間：${yen(s.totalRevenue)}円`, 'b'));
   // ボタンは金額の下の行にまとめて並べる（画面の幅で折り返し方が変わらないように）
-  r3.push(`<div class="sbtns"><button class="salbtn" data-sal="${s.ym}">💴 給料計算</button><button class="salbtn rvbtn" data-rv="${s.ym}">📷 営収取込（${ymJp(s.ym)}分）</button></div>`);
+  r3.push(`<div class="sbtns"><button class="salbtn" data-sal="${s.ym}">💴 給料計算</button><button class="salbtn rvbtn" data-rv="${s.ym}">📷 営収取込</button><a class="salbtn nkbtn" href="${NOKIN_URL}">🧮 納金電卓</a></div>`);
   return `<div class="sum">${row('期間情報', r1)}${row('回数集計', r2)}${row('営収集計', r3)}</div>`;
 }
 
