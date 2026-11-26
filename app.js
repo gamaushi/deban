@@ -12,6 +12,8 @@ const ymJp = ym => `${ymY(ym)}年${ymM(ym)}月`;
 const BETA = /\/beta\//.test(location.pathname);
 const LS_DATA = BETA ? 'deban_data_beta' : 'deban_data';
 // 納金電卓（同じリポジトリの nokin/）。試験版から開いても本物の納金電卓へ行く
+// 納金電卓ボタンの電卓マーク（絵文字に電卓がないので自前で描く。どの機種でも同じ見た目）
+const CALC_SVG = '<svg viewBox="0 0 24 24" width="1.3em" height="1.3em" aria-hidden="true"><rect x="4.5" y="2" width="15" height="20" rx="3" fill="#0B4278"/><rect x="6.8" y="4.3" width="10.4" height="5" rx="1" fill="#E6F4FF"/><text x="16.3" y="8.4" font-size="4.6" font-weight="700" text-anchor="end" fill="#0B4278" font-family="sans-serif">¥</text><g fill="#9CCBF0"><rect x="7" y="11" width="2.6" height="2.4" rx=".6"/><rect x="10.7" y="11" width="2.6" height="2.4" rx=".6"/><rect x="14.4" y="11" width="2.6" height="2.4" rx=".6"/><rect x="7" y="14.6" width="2.6" height="2.4" rx=".6"/><rect x="10.7" y="14.6" width="2.6" height="2.4" rx=".6"/><rect x="14.4" y="14.6" width="2.6" height="2.4" rx=".6"/><rect x="7" y="18.2" width="2.6" height="2.4" rx=".6"/><rect x="10.7" y="18.2" width="2.6" height="2.4" rx=".6"/></g><rect x="14.4" y="18.2" width="2.6" height="2.4" rx=".6" fill="#F28C2E"/></svg>';
 const NOKIN_URL = BETA ? '../nokin/' : './nokin/';
 if (BETA && lsGet(LS_DATA) === null && lsGet('deban_data') !== null) lsSet(LS_DATA, lsGet('deban_data'));
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -313,7 +315,7 @@ function summaryHtml(s, p) {
   if (!s.dailyNight || s.extraCount > 0) { r3.push(it(`出番：${yen(s.baseRevenue)}円`)); r3.push(it(`公出：${yen(s.extraRevenue)}円`)); }
   r3.push(it(`月間：${yen(s.totalRevenue)}円`, 'b'));
   // ボタンは金額の下の行にまとめて並べる（画面の幅で折り返し方が変わらないように）
-  r3.push(`<div class="sbtns"><button class="salbtn" data-sal="${s.ym}">💴 給料計算</button><button class="salbtn rvbtn" data-rv="${s.ym}">📷 営収取込</button><a class="salbtn nkbtn" href="${NOKIN_URL}">🧮 納金電卓</a></div>`);
+  r3.push(`<div class="sbtns"><button class="salbtn" data-sal="${s.ym}"><span class="ic">💴</span>給料計算</button><button class="salbtn rvbtn" data-rv="${s.ym}"><span class="ic">📷</span>営収取込</button><a class="salbtn nkbtn" href="${NOKIN_URL}"><span class="ic">${CALC_SVG}</span>納金電卓</a></div>`);
   return `<div class="sum">${row('期間情報', r1)}${row('回数集計', r2)}${row('営収集計', r3)}</div>`;
 }
 

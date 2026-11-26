@@ -123,10 +123,12 @@ textarea.memo::placeholder, #rev::placeholder { color: #BBB; }
 .pltag.blue { background: #E3F0FF; color: #1E6FD0; }
 .cell.flash { animation: cellflash 0.5s ease-in-out 4; }
 @keyframes cellflash { 50% { box-shadow: inset 0 0 0 4px #F28C2E; } }
-.sbtns { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 2px 0; }
-.sbtns .salbtn { padding: 5px 12px; }
+/* 3つのボタンを同じ幅で1行に並べる。絵文字は上、文字は下（幅320pxの機種でも1行に収まる） */
+.sbtns { flex-basis: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 2px 0; }
+.sbtns .salbtn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 5px 2px; text-align: center; line-height: 1.25; white-space: nowrap; }
+.sbtns .salbtn .ic { font-size: calc(18px * var(--k)); height: 1.3em; display: flex; align-items: center; }
 .salbtn.rvbtn { background: #D6EC9C; color: #3F5A0A; }
-.salbtn.nkbtn { background: #9CCBF0; color: #0B4278; text-decoration: none; display: inline-block; }
+.salbtn.nkbtn { background: #9CCBF0; color: #0B4278; text-decoration: none; }
 .salbtn { background: #F8C6D4; color: #7A1F44; border: 0; border-radius: 4px; font-size: calc(13px * var(--k)); font-weight: 700; padding: 3px 10px; }
 
 /* ===== 給料・設定画面 ===== */
