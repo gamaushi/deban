@@ -317,6 +317,7 @@ function summaryHtml(s, p) {
   return `<div class="sum">${row('期間情報', r1)}${row('回数集計', r2)}${row('営収集計', r3)}</div>`;
 }
 
+const HOME_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
 function monthInner(ym) {
   const led = ledger(), p = pattern(), simple = p === DAILY_NIGHT && simpleMode;
   const red = union(led.publicDutyDates(ym), led.publicDutyDates(ym + 1));
@@ -330,7 +331,7 @@ function monthInner(ym) {
   const grid = `<div class="grid${simple ? ' simple' : ''}">${g}</div>`;
   return (ym === ymNow()
     ? `<div class="nowbox"><div class="mtitle now">${ymJp(ym)}<span class="nowtag">今月</span></div>${grid}</div>`
-    : `<div class="mtitle">${ymJp(ym)}</div>${grid}`) +
+    : `<div class="monbox"><div class="mtitle other">${ymJp(ym)}<button class="homebtn" data-home aria-label="今月へ戻る">${HOME_SVG}</button></div>${grid}</div>`) +
     (simple ? '' : summaryHtml(led.summary(ym), p));
 }
 
@@ -516,6 +517,7 @@ $('#modeSw').addEventListener('click', e => {
 $('#title').addEventListener('click', () => monthPicker(topMonth()));
 $('#gear').addEventListener('click', () => go('setting'));
 monthsEl.addEventListener('click', e => {
+  if (e.target.closest('[data-home]')) { scrollToMonth(ymNow(), true); return; }
   const pl = e.target.closest('[data-paid]');
   if (pl) { showPaidList(+pl.dataset.paid); return; }
   const rv = e.target.closest('[data-rv]');
