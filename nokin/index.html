@@ -30,7 +30,11 @@ button{font:inherit;cursor:pointer}
 /* ---- 上の帯 ---- */
 header{display:flex;align-items:center;gap:8px;padding:5px 14px 4px;border-bottom:1px solid var(--rule)}
 header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
-.hbtn{border:1px solid var(--rule);background:#fff;border-radius:8px;padding:4px 11px;font-size:14px;color:var(--ink-soft)}
+.hbtn{border:1px solid var(--rule);background:#fff;border-radius:8px;padding:4px 12px;font-size:15px;color:var(--ink-soft);white-space:nowrap;
+  box-shadow:0 2px 0 rgba(0,0,0,.12)}
+.hbtn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(0,0,0,.12)}
+#clearBtn{background:linear-gradient(#FFF5F2,#F3CFC6);border-color:#D9A99D;color:#7A2E1F}
+#setBtn{background:linear-gradient(#F7F9FB,#D3DBE4);border-color:#AEB9C6;color:#33414F}
 
 /* ---- 項目一覧 ---- */
 #list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 14px 2px;display:flex;flex-direction:column}
@@ -59,7 +63,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 #warn{color:var(--warn);font-size:12px;margin-top:4px;display:none}
 #bar{display:flex;align-items:center;gap:8px;margin-top:6px}
 #thumb{width:44px;height:44px;object-fit:cover;border:1.5px solid var(--ink-soft);display:none;border-radius:3px}
-.bigbtn{flex:1;height:44px;border:1px solid;border-radius:8px;color:#fff;font-weight:bold;font-size:16px;
+.bigbtn{flex:1;height:48px;border:1px solid;border-radius:8px;color:#fff;font-weight:bold;font-size:21px;letter-spacing:.1em;white-space:nowrap;
   box-shadow:0 3px 0 rgba(0,0,0,.25)}
 .bigbtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
 #shoot{background:linear-gradient(#9AA3AF,#6E7683);border-color:#575E68}
