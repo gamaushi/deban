@@ -16,7 +16,7 @@
 <style>
 /* 画面構成：上に青い帯（班・年月・設定）と曜日を固定し、その下に月が縦に続く */
 :root {
-  --band: linear-gradient(90deg, #5FA8E0, #DDF0FC, #5FA8E0); --band-ink: #0B3A6B; --blue: #1E6FB8; --blue2: #2989D8; --bg: #F5F5F5; --white: #fff; --ink: #222; --ink2: #555; --muted: #888;
+  --band: linear-gradient(90deg, #5FA8E0, #DDF0FC, #5FA8E0); --band-ink: #0B3A6B; --band2: linear-gradient(90deg, #AEB8C4, #EEF1F4, #AEB8C4); --band2-ink: #36404C; --blue: #1E6FB8; --blue2: #2989D8; --bg: #F5F5F5; --white: #fff; --ink: #222; --ink2: #555; --muted: #888;
   --grid: #CEDDE2; --label-bg: #EFF8FF; --week-line: #B0C4DE;
   --sun: #E00000; --sat: #0050E0; --today: #008000; --orange: #CC6600; --red: #CC0000; --green: #008000; --amber: #FF6600;
   --c-revenue: #D8BFD8; --c-work: #E6E6FA; --c-paid: #FFE6E6; --c-absent: #FFCCCC;
@@ -75,6 +75,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 /* 枠も帯と同じグラデーション（角を丸めたまま枠に色を付けるため、背景を2枚重ねる） */
 .nowbox { border: 3px solid transparent; border-radius: 8px; overflow: hidden; background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--band) border-box; }
 .nowbox .mtitle.now { border-radius: 0; }
+/* 今月以外の月：灰色の帯と枠。横の家のマークで今月へ戻る */
+.monbox { border: 3px solid transparent; border-radius: 8px; overflow: hidden; background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--band2) border-box; }
+.mtitle.other { background: var(--band2); color: var(--band2-ink); font-size: calc(18px * var(--k)); padding: 4px 0; }
+.homebtn { display: inline-flex; align-items: center; justify-content: center; vertical-align: -3px; margin-left: 8px; width: calc(30px * var(--k)); height: calc(22px * var(--k)); border: 0; border-radius: 11px; background: #fff; color: var(--band-ink); padding: 0; cursor: pointer; }
+.homebtn svg { width: calc(16px * var(--k)); height: calc(16px * var(--k)); }
 .mtitle .nowtag { display: inline-block; background: #fff; color: var(--band-ink); font-size: calc(12px * var(--k)); border-radius: 10px; padding: 0 8px; margin-left: 6px; vertical-align: 2px; line-height: 1.6; }
 .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #fff; }
 .cell { min-height: 80px; border: .5px solid var(--grid); padding: 2px; display: flex; flex-direction: column;
