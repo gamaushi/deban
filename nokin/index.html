@@ -36,14 +36,16 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 #list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 14px 2px;display:flex;flex-direction:column}
 .row{display:flex;align-items:center;flex:1 0 auto;min-height:35px;max-height:56px;border-bottom:1px solid var(--rule);padding:1px 0}
 .row:active{background:#F3EFE4}
-.row .lab{flex:1;font-size:15px}
+.row .lab{flex:1;font-size:18px;font-weight:bold}
 .row .val{width:130px;text-align:right;font-size:18px;font-variant-numeric:tabular-nums;line-height:1.2;
-  padding:3px 8px;border:1px solid var(--rule);border-radius:6px;background:#fff;min-height:29px}
+  padding:3px 8px;border:1px solid transparent;border-radius:6px;background:none;min-height:29px}
+/* 空の欄はアプリ版と同じく薄い「0」を出す */
+.row .val:empty::before{content:"0";color:#E3DED2;font-style:normal;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
 .row.hand .val{font-style:italic;font-family:"Hiragino Mincho ProN",serif;color:var(--ink-soft)}
 .row .val.qq{color:var(--warn);font-weight:bold;font-style:normal}
 .row .val.low{background:var(--low-bg);border-color:var(--low-line)}
 .row.main{border-bottom:1.5px solid var(--ink-soft);min-height:42px}
-.row.main .lab{font-weight:bold;font-size:16px}
+.row.main .lab{font-weight:bold;font-size:19px}
 .row.main .val{font-size:21px}
 .memo{flex:none;text-align:right;font-size:12px;color:var(--ink-soft);padding:0 4px 2px;display:none;word-break:break-all}
 .memo.show{display:block}
@@ -51,7 +53,7 @@ header h1{font-size:17px;margin:0;flex:1;letter-spacing:.05em}
 /* ---- 下に固定 ---- */
 #bottom{border-top:1px solid var(--ink-soft);padding:6px 14px calc(8px + env(safe-area-inset-bottom));background:var(--paper)}
 #result{display:flex;align-items:center;background:var(--cash-bg);padding:5px 14px;border-radius:4px}
-#result .lab{flex:1;font-weight:bold;font-size:15px}
+#result .lab{flex:1;font-weight:bold;font-size:18px}
 #genkin{font-weight:bold;font-size:25px;color:var(--cash);font-variant-numeric:tabular-nums}
 #genkin.neg{color:var(--warn)}
 #warn{color:var(--warn);font-size:12px;margin-top:4px;display:none}
