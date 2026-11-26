@@ -1320,7 +1320,8 @@ function fixFontScale() {
     ctx.font = `400 40px ${fam}`;
     const ref = ctx.measureText(txt).width;
     if (!(dom > 0 && ref > 0)) return;
-    const ratio = dom / ref;
+    const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;   // パソコン用の拡大は打ち消さない
+    const ratio = dom / ref / zoom;
     const k = ratio > 1.04 ? 1 / ratio : 1;   // 大きくなっているときだけ縮める
     document.documentElement.style.setProperty('--k', k.toFixed(3));
   } catch (e) { /* 測れなければそのまま */ }

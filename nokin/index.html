@@ -8,13 +8,14 @@
 <meta name="apple-mobile-web-app-title" content="納金電卓">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#DDF0FC">
+<meta name="color-scheme" content="only light">
 <meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
 <title>納金電卓</title>
 <style>
 :root{
-  color-scheme: light;
+  color-scheme: only light;   /* ブラウザのナイトモード（自動で暗くする機能）を止める */
   --paper:#FFFDF8; --ink:#1E1C19; --ink-soft:#6B675F; --rule:#D8D3C7;
   --cash:#2F5D43; --cash-bg:#E7EFE8; --warn:#A13D2C;
   --low-bg:#FFF1A8; --low-line:#D9B400;
@@ -26,6 +27,11 @@ html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);
 body{display:flex;flex-direction:column;height:100dvh;
   padding-top:env(safe-area-inset-top);user-select:none;-webkit-user-select:none}
 button{font:inherit;cursor:pointer}
+/* 折りたたみスマホを広げた画面やパソコンでは、幅に上限をつけて真ん中に置く（項目名と金額が離れすぎないように） */
+@media (min-width:600px){
+  html{background:#CBD5E1}
+  body{max-width:520px;margin:0 auto;box-shadow:0 0 24px rgba(0,0,0,.18)}
+}
 
 /* ---- 上の帯 ---- */
 header{display:flex;align-items:center;gap:8px;padding:5px 14px 4px;border-bottom:1px solid var(--rule);
