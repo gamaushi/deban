@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="出番ですョ!">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#1E6FB8">
+<meta name="theme-color" content="#DDF0FC">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -16,7 +16,7 @@
 <style>
 /* 画面構成：上に青い帯（班・年月・設定）と曜日を固定し、その下に月が縦に続く */
 :root {
-  --blue: #1E6FB8; --blue2: #2989D8; --bg: #F5F5F5; --white: #fff; --ink: #222; --ink2: #555; --muted: #888;
+  --band: linear-gradient(90deg, #DDF0FC, #5FA8E0); --band-ink: #0B3A6B; --blue: #1E6FB8; --blue2: #2989D8; --bg: #F5F5F5; --white: #fff; --ink: #222; --ink2: #555; --muted: #888;
   --grid: #CEDDE2; --label-bg: #EFF8FF; --week-line: #B0C4DE;
   --sun: #E00000; --sat: #0050E0; --today: #008000; --orange: #CC6600; --red: #CC0000; --green: #008000; --amber: #FF6600;
   --c-revenue: #D8BFD8; --c-work: #E6E6FA; --c-paid: #FFE6E6; --c-absent: #FFCCCC;
@@ -32,7 +32,7 @@ body { margin: 0; background: var(--bg); color: var(--ink);
   font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif; }
 button { font: inherit; color: inherit; cursor: pointer; }
 input, select { font: inherit; }
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe-t); background: var(--blue); z-index: 30; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe-t); background: var(--band); z-index: 30; }
 
 /* ===== 上部 ===== */
 /* パソコンなど広い画面では、横に間延びしないよう幅に上限をつけて真ん中に置く */
@@ -41,10 +41,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
   body { max-width: 860px; margin: 0 auto; box-shadow: 0 0 24px rgba(0,0,0,.18); min-height: 100vh; }
 }
 #top { position: sticky; top: var(--safe-t); z-index: 20; background: var(--bg); }
-.bar { display: flex; align-items: center; gap: 4px; background: var(--blue); color: #fff;
+.bar { display: flex; align-items: center; gap: 4px; background: var(--band); color: var(--band-ink);
   padding: 3px max(6px, var(--safe-r)) 3px max(6px, var(--safe-l)); min-height: 46px; flex-wrap: nowrap; }
 .pat { border: 0; border-radius: 6px; padding: 5px 9px; font-weight: 700; color: #1E3A5F; white-space: nowrap; font-size: calc(15px * var(--k)); }
-.title { flex: 1; min-width: 0; border: 0; background: none; color: #fff; font-size: calc(20px * var(--k)); font-weight: 700; padding: 4px 0;
+.title { flex: 1; min-width: 0; border: 0; background: none; color: var(--band-ink); font-size: calc(20px * var(--k)); font-weight: 700; padding: 4px 0;
   overflow: hidden; height: 36px; position: relative; }
 .title span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
 .title span.in-up { animation: inUp .45s ease both; } .title span.out-up { animation: outUp .45s ease both; }
@@ -54,10 +54,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 @keyframes inDown { from { transform: translateY(-100%); opacity: 0 } to { transform: none; opacity: 1 } }
 @keyframes outDown { from { transform: none; opacity: 1 } to { transform: translateY(100%); opacity: 0 } }
 @media (prefers-reduced-motion: reduce) { .title span { animation: none !important; } }
-.seg { display: flex; border: 1px solid #fff; border-radius: 6px; overflow: hidden; }
-.seg button { border: 0; background: none; color: #fff; font-size: calc(13px * var(--k)); padding: 3px 7px; }
-.seg button.on { background: #fff; color: var(--blue); font-weight: 700; }
-.gear { border: 0; background: none; color: #fff; width: 40px; height: 40px; display: grid; place-items: center; padding: 0; }
+.seg { display: flex; border: 1px solid var(--band-ink); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; background: none; color: var(--band-ink); font-size: calc(13px * var(--k)); padding: 3px 7px; }
+.seg button.on { background: var(--band-ink); color: #fff; font-weight: 700; }
+.gear { border: 0; background: none; color: var(--band-ink); width: 40px; height: 40px; display: grid; place-items: center; padding: 0; }
 .week { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--label-bg);
   margin: 0 max(4px, var(--safe-r)) 0 max(4px, var(--safe-l)); }
 .week div { text-align: center; font-weight: 700; font-size: calc(14px * var(--k)); border: .5px solid var(--week-line); padding: 1px 0; }
@@ -71,10 +71,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--safe
 #months { padding: 0 max(4px, var(--safe-r)) calc(16px + var(--safe-b)) max(4px, var(--safe-l)); }
 .month { padding-bottom: 10px; }
 .mtitle { text-align: center; font-size: calc(16px * var(--k)); font-weight: 700; color: #333; padding: 3px 0; }
-.mtitle.now { background: #7DD3FC; color: #0C3A5B; font-size: calc(18px * var(--k)); border-radius: 6px 6px 0 0; padding: 4px 0; }
-.nowbox { border: 3px solid #7DD3FC; border-radius: 8px; overflow: hidden; }
+.mtitle.now { background: var(--band); color: var(--band-ink); font-size: calc(18px * var(--k)); border-radius: 6px 6px 0 0; padding: 4px 0; }
+/* 枠も帯と同じグラデーション（角を丸めたまま枠に色を付けるため、背景を2枚重ねる） */
+.nowbox { border: 3px solid transparent; border-radius: 8px; overflow: hidden; background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--band) border-box; }
 .nowbox .mtitle.now { border-radius: 0; }
-.mtitle .nowtag { display: inline-block; background: #fff; color: #0C3A5B; font-size: calc(12px * var(--k)); border-radius: 10px; padding: 0 8px; margin-left: 6px; vertical-align: 2px; line-height: 1.6; }
+.mtitle .nowtag { display: inline-block; background: #fff; color: var(--band-ink); font-size: calc(12px * var(--k)); border-radius: 10px; padding: 0 8px; margin-left: 6px; vertical-align: 2px; line-height: 1.6; }
 .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #fff; }
 .cell { min-height: 80px; border: .5px solid var(--grid); padding: 2px; display: flex; flex-direction: column;
   justify-content: space-between; align-items: center; overflow: hidden; position: relative; background: #fff; }
@@ -130,9 +131,9 @@ textarea.memo::placeholder, #rev::placeholder { color: #BBB; }
 
 /* ===== 給料・設定画面 ===== */
 .view { min-height: 100vh; background: #F0F4F8; }
-.vbar { position: sticky; top: var(--safe-t); z-index: 20; display: flex; align-items: center; gap: 6px; background: var(--blue); color: #fff;
+.vbar { position: sticky; top: var(--safe-t); z-index: 20; display: flex; align-items: center; gap: 6px; background: var(--band); color: var(--band-ink);
   padding: 4px max(8px, var(--safe-r)) 4px max(4px, var(--safe-l)); min-height: 50px; font-size: 19px; font-weight: 700; }
-.back { border: 0; background: none; color: #fff; font-size: 24px; width: 44px; height: 44px; padding: 0; }
+.back { border: 0; background: none; color: var(--band-ink); font-size: 24px; width: 44px; height: 44px; padding: 0; }
 .vbody { padding: 12px max(12px, var(--safe-r)) calc(28px + var(--safe-b)) max(12px, var(--safe-l)); display: flex; flex-direction: column; gap: 12px; max-width: 640px; margin: 0 auto; }
 .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.12); padding: 14px; display: flex; flex-direction: column; gap: 6px; }
 .card h2 { margin: 0; font-size: 17px; }
